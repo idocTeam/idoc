@@ -4,20 +4,17 @@ import morgan from "morgan";
 
 import doctorAuthRoutes from "./routes/doctorAuthRoutes.js";
 import doctorProfileRoutes from "./routes/doctorProfileRoutes.js";
+import availabilityRoutes from "./routes/availabilityRoutes.js";
 
 const app = express();
 
-// -----------------------------
-// Global Middlewares
-// -----------------------------
+// Global middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
-// -----------------------------
-// Health Check Route
-// -----------------------------
+// Health route
 app.get("/", (req, res) => {
   res.status(200).json({
     service: "doctor-service",
@@ -26,24 +23,19 @@ app.get("/", (req, res) => {
   });
 });
 
-// -----------------------------
-// API Routes
-// -----------------------------
+// API routes
 app.use("/api/doctors/auth", doctorAuthRoutes);
 app.use("/api/doctors/profile", doctorProfileRoutes);
+app.use("/api/doctors/availability", availabilityRoutes);
 
-// -----------------------------
-// 404 Route Handler
-// -----------------------------
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     message: "Route not found"
   });
 });
 
-// -----------------------------
-// Global Error Handler
-// -----------------------------
+// Global error handler
 app.use((err, req, res, next) => {
   console.error("Global Error:", err);
 
