@@ -356,3 +356,33 @@ export const searchDoctorsByHospital = async (req, res) => {
     });
   }
 };
+
+
+// Public-safe single doctor profile
+export const getDoctorPublicProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const query = {
+      _id: id,
+      ...buildApprovedDoctorQuery()
+    };
+
+    const doctor = await Doctor.findOne(query).select(PUBLIC_DOCTOR_FIELDS);
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Approved doctor not found."
+      });
+    }
+
+    return res.status(200).json({
+      doctor
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch doctor public profile.",
+      error: error.message
+    });
+  }
+};
