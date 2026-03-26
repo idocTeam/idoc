@@ -113,3 +113,50 @@ export const updateMyDoctorProfile = async (req, res) => {
     });
   }
 };
+
+
+// Doctor deletes own account
+// Prefer soft delete if your schema has isActive / deletedAt
+export const deleteMyDoctorAccount = async (req, res) => {
+  try {
+    const doctor = await Doctor.findById(req.user.id);
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Doctor not found."
+      });
+    }
+
+    const hasIsActive = !!Doctor.schema.path("isActive");
+    const hasDeletedAt = !!Doctor.schema.path("deletedAt");
+
+    // Soft delete if supported by schema
+    if (hasIsActive || hasDeletedAt) {
+      if (hasIsActive) {
+        doctor.isActive = false;
+      }
+
+      if (hasDeletedAt) {
+        doctor.deletedAt = new Date();
+      }
+
+      await doctor.save();
+
+      return res.status(200).json({
+        message: "Doctor account deactivated successfully."
+      });
+    }
+
+    // Fallback hard delete if schema has no soft-delete fields
+    await Doctor.findByIdAndDelete(req.user.id);
+
+    return res.status(200).json({
+      message: "Doctor account deleted successfully."
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to delete doctor account.",
+      error: error.message
+    });
+  }
+};
