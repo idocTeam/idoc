@@ -5,6 +5,7 @@ import morgan from "morgan";
 import doctorAuthRoutes from "./routes/doctorAuthRoutes.js";
 import doctorProfileRoutes from "./routes/doctorProfileRoutes.js";
 import availabilityRoutes from "./routes/availabilityRoutes.js";
+import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get("/", (req, res) => {
 app.use("/api/doctors/auth", doctorAuthRoutes);
 app.use("/api/doctors/profile", doctorProfileRoutes);
 app.use("/api/doctors/availability", availabilityRoutes);
+app.use("/api/doctors/prescriptions", prescriptionRoutes);
 
 // 404 handler
 app.use((req, res) => {
