@@ -270,3 +270,89 @@ export const searchApprovedDoctors = async (req, res) => {
     });
   }
 };
+
+
+
+// Search only by specialty
+export const searchDoctorsBySpecialty = async (req, res) => {
+  try {
+    const specialty = (req.query.specialty || req.params.specialty || "").trim();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    if (!specialty) {
+      return res.status(400).json({
+        message: "Specialty is required."
+      });
+    }
+
+    const query = {
+      ...buildApprovedDoctorQuery(),
+      specialty: { $regex: escapeRegex(specialty), $options: "i" }
+    };
+
+    const [doctors, total] = await Promise.all([
+      Doctor.find(query)
+        .select(PUBLIC_DOCTOR_FIELDS)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Doctor.countDocuments(query)
+    ]);
+
+    return res.status(200).json({
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      doctors
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to search doctors by specialty.",
+      error: error.message
+    });
+  }
+};
+
+// Search only by hospital
+export const searchDoctorsByHospital = async (req, res) => {
+  try {
+    const hospital = (req.query.hospital || req.params.hospital || "").trim();
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    if (!hospital) {
+      return res.status(400).json({
+        message: "Hospital is required."
+      });
+    }
+
+    const query = {
+      ...buildApprovedDoctorQuery(),
+      hospital: { $regex: escapeRegex(hospital), $options: "i" }
+    };
+
+    const [doctors, total] = await Promise.all([
+      Doctor.find(query)
+        .select(PUBLIC_DOCTOR_FIELDS)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Doctor.countDocuments(query)
+    ]);
+
+    return res.status(200).json({
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      doctors
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to search doctors by hospital.",
+      error: error.message
+    });
+  }
+};
