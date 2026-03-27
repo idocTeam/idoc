@@ -16,8 +16,7 @@ export const registerDoctor = async (req, res) => {
       consultationFee,
       bio,
       experienceYears,
-      medicalLicenseNumber,
-      availability
+      medicalLicenseNumber
     } = req.body;
 
     // Basic required field validation
@@ -58,7 +57,7 @@ export const registerDoctor = async (req, res) => {
     // Hash password
     const hashedPw = await bcrypt.hash(pw, 10);
 
-    // Create doctor with pending status by default
+    // Create doctor WITHOUT availability
     const doctor = await Doctor.create({
       email,
       pw: hashedPw,
@@ -70,12 +69,12 @@ export const registerDoctor = async (req, res) => {
       consultationFee,
       bio,
       experienceYears,
-      medicalLicenseNumber,
-      availability: Array.isArray(availability) ? availability : []
+      medicalLicenseNumber
     });
 
     return res.status(201).json({
-      message: "Doctor registered successfully. Waiting for admin approval.",
+      message:
+        "Doctor registered successfully. Waiting for admin approval. Add availability after login.",
       doctor: {
         id: doctor._id,
         userId: doctor.userId,
@@ -100,14 +99,12 @@ export const loginDoctor = async (req, res) => {
   try {
     const { email, pw } = req.body;
 
-    // Validate input
     if (!email || !pw) {
       return res.status(400).json({
         message: "Email and password are required."
       });
     }
 
-    // Find doctor and include pw explicitly because select:false
     const doctor = await Doctor.findOne({ email }).select("+pw");
 
     if (!doctor) {
@@ -116,7 +113,6 @@ export const loginDoctor = async (req, res) => {
       });
     }
 
-    // Compare password
     const isMatch = await bcrypt.compare(pw, doctor.pw);
 
     if (!isMatch) {
@@ -125,7 +121,6 @@ export const loginDoctor = async (req, res) => {
       });
     }
 
-    // Block login if not approved
     if (doctor.approvalStatus === "pending") {
       return res.status(403).json({
         message: "Your account is still pending admin approval."
@@ -139,7 +134,6 @@ export const loginDoctor = async (req, res) => {
       });
     }
 
-    // Generate JWT
     const token = generateToken({
       id: doctor._id,
       userId: doctor.userId,
