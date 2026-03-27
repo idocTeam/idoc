@@ -374,3 +374,82 @@ export const getDoctorPublicProfile = async (req, res) => {
     });
   }
 };
+
+
+//for admin purpos
+
+// Internal admin-facing fields
+const ADMIN_DOCTOR_FIELDS = "-pw";
+
+// Get all pending doctors for admin review
+export const getPendingDoctorsForAdmin = async (req, res) => {
+  try {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const query = { approvalStatus: "pending" };
+
+    // If schema supports soft delete, avoid deleted doctors
+    if (Doctor.schema.path("isActive")) {
+      query.isActive = { $ne: false };
+    }
+
+    const [doctors, total] = await Promise.all([
+      Doctor.find(query)
+        .select(ADMIN_DOCTOR_FIELDS)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Doctor.countDocuments(query)
+    ]);
+
+    return res.status(200).json({
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      doctors
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch pending doctors.",
+      error: error.message
+    });
+  }
+};
+
+// Get all approved doctors for admin view
+export const getApprovedDoctorsForAdmin = async (req, res) => {
+  try {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const limit = Math.max(Number(req.query.limit) || 10, 1);
+    const skip = (page - 1) * limit;
+
+    const query = { approvalStatus: "approved" };
+
+    if (Doctor.schema.path("isActive")) {
+      query.isActive = { $ne: false };
+    }
+
+    const [doctors, total] = await Promise.all([
+      Doctor.find(query)
+        .select(ADMIN_DOCTOR_FIELDS)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Doctor.countDocuments(query)
+    ]);
+
+    return res.status(200).json({
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      doctors
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch approved doctors for admin.",
+      error: error.message
+    });
+  }
+};

@@ -8,7 +8,9 @@ import {
   searchApprovedDoctors,
   searchDoctorsBySpecialty,
   searchDoctorsByHospital,
-  getDoctorPublicProfile
+  getDoctorPublicProfile,
+  getPendingDoctorsForAdmin,
+  getApprovedDoctorsForAdmin
 } from "../controllers/doctorProfileController.js";
 
 // Change this import to match your actual auth middleware file/function name
@@ -39,5 +41,9 @@ router.get("/public/:id", getDoctorPublicProfile);
   Keep this after all specific routes
 */
 router.get("/:id", getDoctorById);
+
+// Admin-facing read-only doctor lists
+router.get("/admin/pending", getPendingDoctorsForAdmin);
+router.get("/admin/approved", getApprovedDoctorsForAdmin);
 
 export default router;
