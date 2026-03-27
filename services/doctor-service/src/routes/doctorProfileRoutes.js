@@ -10,7 +10,10 @@ import {
   searchDoctorsByHospital,
   getDoctorPublicProfile,
   getPendingDoctorsForAdmin,
-  getApprovedDoctorsForAdmin
+  getApprovedDoctorsForAdmin,
+  approveDoctor,
+  rejectDoctor,
+  deleteDoctorByAdmin
 } from "../controllers/doctorProfileController.js";
 
 // Change this import to match your actual auth middleware file/function name
@@ -32,5 +35,10 @@ router.get("/admin/pending", getPendingDoctorsForAdmin);
 router.get("/admin/approved", getApprovedDoctorsForAdmin);
 
 router.get("/:id", getDoctorById);
+
+// Admin-triggered doctor management routes
+router.patch("/admin/:id/approve", approveDoctor);
+router.patch("/admin/:id/reject", rejectDoctor);
+router.delete("/admin/:id", deleteDoctorByAdmin);
 
 export default router;
