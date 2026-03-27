@@ -67,8 +67,8 @@ export const updateMyDoctorProfile = async (req, res) => {
       "hospital",
       "consultationFee",
       "bio",
-      "experienceYears",
-      "availability"
+      "experienceYears"
+      
     ];
 
     const updates = {};
@@ -85,15 +85,7 @@ export const updateMyDoctorProfile = async (req, res) => {
       });
     }
 
-    // Prevent accidental invalid availability type
-    if (
-      updates.availability !== undefined &&
-      !Array.isArray(updates.availability)
-    ) {
-      return res.status(400).json({
-        message: "Availability must be an array."
-      });
-    }
+    
 
     Object.assign(doctor, updates);
     await doctor.save();

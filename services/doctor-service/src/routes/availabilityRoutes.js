@@ -3,6 +3,7 @@ import {
   getMyAvailability,
   upsertMyAvailability,
   addAvailabilitySlot,
+  updateAvailabilitySlot,
   removeAvailabilitySlot,
   toggleAvailabilityStatus,
   getDoctorAvailabilityById,
@@ -18,6 +19,10 @@ const router = express.Router();
 router.get("/me", protectDoctor, getMyAvailability);
 router.put("/me", protectDoctor, upsertMyAvailability);
 router.post("/me/slot", protectDoctor, addAvailabilitySlot);
+
+// NEW: update one slot by index
+router.patch("/me/slot/:index", protectDoctor, updateAvailabilitySlot);
+
 router.delete("/me/slot/:index", protectDoctor, removeAvailabilitySlot);
 router.patch("/me/slot/:index/toggle", protectDoctor, toggleAvailabilityStatus);
 

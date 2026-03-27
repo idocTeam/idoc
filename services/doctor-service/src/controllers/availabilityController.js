@@ -1,10 +1,11 @@
 import Doctor from "../models/Doctor.js";
+import Availability from "../models/Availability.js";
 
 // ---------------------------------------------------
 // Helpers
 // ---------------------------------------------------
 
-// Normalize slot shape so the controller stays flexible
+// Normalize one slot so the API stays flexible
 const normalizeSlot = (slot = {}) => {
   return {
     day: slot.day || "",
@@ -21,11 +22,13 @@ const normalizeSlot = (slot = {}) => {
   };
 };
 
+// Normalize full array
 const normalizeAvailabilityArray = (availability = []) => {
   if (!Array.isArray(availability)) return [];
   return availability.map(normalizeSlot);
 };
 
+// Convert HH:MM into minutes for comparison
 const toMinutes = (time = "") => {
   if (!time || typeof time !== "string" || !time.includes(":")) return null;
 
@@ -45,6 +48,7 @@ const toMinutes = (time = "") => {
   return hours * 60 + minutes;
 };
 
+// Validate one slot
 const isValidSlot = (slot = {}) => {
   if (!slot.day && !slot.date) return false;
   if (!slot.startTime || !slot.endTime) return false;
@@ -58,6 +62,7 @@ const isValidSlot = (slot = {}) => {
   return true;
 };
 
+// Reusable query builder for approved doctors
 const buildApprovedDoctorQuery = () => {
   const query = { approvalStatus: "approved" };
 
@@ -68,23 +73,18 @@ const buildApprovedDoctorQuery = () => {
   return query;
 };
 
+// Slot filter matcher for public filter route
 const slotMatchesFilters = (slot, filters) => {
   const normalized = normalizeSlot(slot);
 
-  if (filters.day && normalized.day) {
-    if (normalized.day.toLowerCase() !== filters.day.toLowerCase()) {
-      return false;
-    }
-  } else if (filters.day && !normalized.day) {
-    return false;
+  if (filters.day) {
+    if (!normalized.day) return false;
+    if (normalized.day.toLowerCase() !== filters.day.toLowerCase()) return false;
   }
 
-  if (filters.date && normalized.date) {
-    if (normalized.date !== filters.date) {
-      return false;
-    }
-  } else if (filters.date && !normalized.date) {
-    return false;
+  if (filters.date) {
+    if (!normalized.date) return false;
+    if (normalized.date !== filters.date) return false;
   }
 
   if (filters.mode) {
@@ -96,9 +96,7 @@ const slotMatchesFilters = (slot, filters) => {
       slotMode === "both" ||
       requestedMode === "both";
 
-    if (!modeMatches) {
-      return false;
-    }
+    if (!modeMatches) return false;
   }
 
   if (filters.time) {
@@ -124,13 +122,18 @@ const slotMatchesFilters = (slot, filters) => {
   return true;
 };
 
+// Find doctor self safely
+const findDoctorByAuthUser = async (doctorId) => {
+  return Doctor.findById(doctorId).select("_id fullName specialty hospital approvalStatus isActive");
+};
+
 // ---------------------------------------------------
-// Doctor self availability
+// Doctor self availability CRUD
 // ---------------------------------------------------
 
 export const getMyAvailability = async (req, res) => {
   try {
-    const doctor = await Doctor.findById(req.user.id).select("availability");
+    const doctor = await findDoctorByAuthUser(req.user.id);
 
     if (!doctor) {
       return res.status(404).json({
@@ -138,8 +141,12 @@ export const getMyAvailability = async (req, res) => {
       });
     }
 
+    const availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
     return res.status(200).json({
-      availability: normalizeAvailabilityArray(doctor.availability)
+      availability: availabilityDoc
+        ? normalizeAvailabilityArray(availabilityDoc.slots)
+        : []
     });
   } catch (error) {
     return res.status(500).json({
@@ -159,6 +166,14 @@ export const upsertMyAvailability = async (req, res) => {
       });
     }
 
+    const doctor = await findDoctorByAuthUser(req.user.id);
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Doctor not found."
+      });
+    }
+
     const normalizedAvailability = normalizeAvailabilityArray(availability);
 
     const invalidSlot = normalizedAvailability.find((slot) => !isValidSlot(slot));
@@ -170,20 +185,24 @@ export const upsertMyAvailability = async (req, res) => {
       });
     }
 
-    const doctor = await Doctor.findById(req.user.id);
-
-    if (!doctor) {
-      return res.status(404).json({
-        message: "Doctor not found."
-      });
-    }
-
-    doctor.availability = normalizedAvailability;
-    await doctor.save();
+    const updatedAvailability = await Availability.findOneAndUpdate(
+      { doctorId: doctor._id },
+      {
+        $set: {
+          doctorId: doctor._id,
+          slots: normalizedAvailability
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true
+      }
+    );
 
     return res.status(200).json({
       message: "Doctor availability updated successfully.",
-      availability: doctor.availability
+      availability: normalizeAvailabilityArray(updatedAvailability.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -204,7 +223,7 @@ export const addAvailabilitySlot = async (req, res) => {
       });
     }
 
-    const doctor = await Doctor.findById(req.user.id);
+    const doctor = await findDoctorByAuthUser(req.user.id);
 
     if (!doctor) {
       return res.status(404).json({
@@ -212,20 +231,93 @@ export const addAvailabilitySlot = async (req, res) => {
       });
     }
 
-    if (!Array.isArray(doctor.availability)) {
-      doctor.availability = [];
+    let availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
+    if (!availabilityDoc) {
+      availabilityDoc = await Availability.create({
+        doctorId: doctor._id,
+        slots: []
+      });
     }
 
-    doctor.availability.push(slot);
-    await doctor.save();
+    availabilityDoc.slots.push(slot);
+    await availabilityDoc.save();
 
     return res.status(201).json({
       message: "Availability slot added successfully.",
-      availability: doctor.availability
+      availability: normalizeAvailabilityArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
       message: "Failed to add availability slot.",
+      error: error.message
+    });
+  }
+};
+
+export const updateAvailabilitySlot = async (req, res) => {
+  try {
+    // Get slot index from URL
+    const { index } = req.params;
+    const slotIndex = Number(index);
+
+    // Validate index
+    if (Number.isNaN(slotIndex) || slotIndex < 0) {
+      return res.status(400).json({
+        message: "Valid availability slot index is required."
+      });
+    }
+
+    // Find logged-in doctor
+    const doctor = await findDoctorByAuthUser(req.user.id);
+
+    if (!doctor) {
+      return res.status(404).json({
+        message: "Doctor not found."
+      });
+    }
+
+    // Find availability document
+    const availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
+    if (!availabilityDoc || !Array.isArray(availabilityDoc.slots)) {
+      return res.status(404).json({
+        message: "Availability not found."
+      });
+    }
+
+    // Check whether slot exists
+    if (!availabilityDoc.slots[slotIndex]) {
+      return res.status(404).json({
+        message: "Availability slot not found."
+      });
+    }
+
+    // Normalize new slot data from request body
+    const updatedSlot = normalizeSlot(req.body);
+
+    // Validate new slot
+    if (!isValidSlot(updatedSlot)) {
+      return res.status(400).json({
+        message:
+          "Slot must include day or date, startTime, and endTime. startTime must be before endTime."
+      });
+    }
+
+    // Replace only the selected slot
+    availabilityDoc.slots[slotIndex] = updatedSlot;
+
+    // Save updated document
+    await availabilityDoc.save();
+
+    return res.status(200).json({
+      message: "Availability slot updated successfully.",
+      slot: normalizeSlot(availabilityDoc.slots[slotIndex]),
+      availability: normalizeAvailabilityArray(availabilityDoc.slots)
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to update availability slot.",
       error: error.message
     });
   }
@@ -242,7 +334,7 @@ export const removeAvailabilitySlot = async (req, res) => {
       });
     }
 
-    const doctor = await Doctor.findById(req.user.id);
+    const doctor = await findDoctorByAuthUser(req.user.id);
 
     if (!doctor) {
       return res.status(404).json({
@@ -250,18 +342,26 @@ export const removeAvailabilitySlot = async (req, res) => {
       });
     }
 
-    if (!Array.isArray(doctor.availability) || !doctor.availability[slotIndex]) {
+    const availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
+    if (!availabilityDoc || !Array.isArray(availabilityDoc.slots)) {
+      return res.status(404).json({
+        message: "Availability not found."
+      });
+    }
+
+    if (!availabilityDoc.slots[slotIndex]) {
       return res.status(404).json({
         message: "Availability slot not found."
       });
     }
 
-    doctor.availability.splice(slotIndex, 1);
-    await doctor.save();
+    availabilityDoc.slots.splice(slotIndex, 1);
+    await availabilityDoc.save();
 
     return res.status(200).json({
       message: "Availability slot removed successfully.",
-      availability: doctor.availability
+      availability: normalizeAvailabilityArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -282,7 +382,7 @@ export const toggleAvailabilityStatus = async (req, res) => {
       });
     }
 
-    const doctor = await Doctor.findById(req.user.id);
+    const doctor = await findDoctorByAuthUser(req.user.id);
 
     if (!doctor) {
       return res.status(404).json({
@@ -290,22 +390,29 @@ export const toggleAvailabilityStatus = async (req, res) => {
       });
     }
 
-    if (!Array.isArray(doctor.availability) || !doctor.availability[slotIndex]) {
+    const availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
+    if (!availabilityDoc || !Array.isArray(availabilityDoc.slots)) {
+      return res.status(404).json({
+        message: "Availability not found."
+      });
+    }
+
+    if (!availabilityDoc.slots[slotIndex]) {
       return res.status(404).json({
         message: "Availability slot not found."
       });
     }
 
-    const currentSlot = normalizeSlot(doctor.availability[slotIndex]);
-    currentSlot.isAvailable = !currentSlot.isAvailable;
+    availabilityDoc.slots[slotIndex].isAvailable =
+      !availabilityDoc.slots[slotIndex].isAvailable;
 
-    doctor.availability[slotIndex] = currentSlot;
-    await doctor.save();
+    await availabilityDoc.save();
 
     return res.status(200).json({
       message: "Availability slot status updated successfully.",
-      slot: doctor.availability[slotIndex],
-      availability: doctor.availability
+      slot: normalizeSlot(availabilityDoc.slots[slotIndex]),
+      availability: normalizeAvailabilityArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -326,7 +433,7 @@ export const getDoctorAvailabilityById = async (req, res) => {
     const doctor = await Doctor.findOne({
       _id: id,
       ...buildApprovedDoctorQuery()
-    }).select("fullName specialty hospital availability");
+    }).select("fullName specialty hospital");
 
     if (!doctor) {
       return res.status(404).json({
@@ -334,13 +441,17 @@ export const getDoctorAvailabilityById = async (req, res) => {
       });
     }
 
+    const availabilityDoc = await Availability.findOne({ doctorId: doctor._id });
+
     return res.status(200).json({
       doctor: {
         id: doctor._id,
         fullName: doctor.fullName,
         specialty: doctor.specialty,
         hospital: doctor.hospital,
-        availability: normalizeAvailabilityArray(doctor.availability)
+        availability: availabilityDoc
+          ? normalizeAvailabilityArray(availabilityDoc.slots)
+          : []
       }
     });
   } catch (error) {
@@ -384,15 +495,36 @@ export const filterDoctorsByAvailability = async (req, res) => {
       });
     }
 
-    const doctors = await Doctor.find(buildApprovedDoctorQuery()).select(
-      "fullName specialty qualifications hospital consultationFee bio experienceYears availability"
+    const approvedDoctors = await Doctor.find(buildApprovedDoctorQuery()).select(
+      "fullName specialty qualifications hospital consultationFee bio experienceYears"
     );
 
-    const matchedDoctors = doctors
+    if (approvedDoctors.length === 0) {
+      return res.status(200).json({
+        total: 0,
+        page: parsedPage,
+        totalPages: 0,
+        doctors: []
+      });
+    }
+
+    const doctorIds = approvedDoctors.map((doctor) => doctor._id);
+
+    const availabilityDocs = await Availability.find({
+      doctorId: { $in: doctorIds }
+    }).select("doctorId slots");
+
+    const availabilityMap = new Map(
+      availabilityDocs.map((doc) => [doc.doctorId.toString(), doc])
+    );
+
+    const matchedDoctors = approvedDoctors
       .map((doctor) => {
-        const matchedSlots = normalizeAvailabilityArray(doctor.availability).filter(
-          (slot) => slotMatchesFilters(slot, filters)
-        );
+        const availabilityDoc = availabilityMap.get(doctor._id.toString());
+
+        const matchedSlots = normalizeAvailabilityArray(
+          availabilityDoc?.slots || []
+        ).filter((slot) => slotMatchesFilters(slot, filters));
 
         if (matchedSlots.length === 0) {
           return null;
