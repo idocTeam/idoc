@@ -2,7 +2,9 @@ import express from "express";
 import {
   registerPatient,
   loginPatient,
-  getMyPatientProfile
+  getMyPatientProfile,
+  updateMyPatientProfile,
+  deleteMyPatientProfile
 } from "../controllers/patientAuthController.js";
 import { protectPatient } from "../middleware/authMiddleware.js";
 
@@ -14,7 +16,13 @@ router.post("/register", registerPatient);
 // Login patient
 router.post("/login", loginPatient);
 
-// Protected route to test JWT
+// Get logged-in patient profile
 router.get("/me", protectPatient, getMyPatientProfile);
+
+// Update logged-in patient profile
+router.put("/me", protectPatient, updateMyPatientProfile);
+
+// Delete logged-in patient profile
+router.delete("/me", protectPatient, deleteMyPatientProfile);
 
 export default router;

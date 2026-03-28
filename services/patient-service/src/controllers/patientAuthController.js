@@ -53,6 +53,8 @@ export const registerPatient = async (req, res) => {
         fullName: patient.fullName,
         phone: patient.phone,
         gender: patient.gender,
+        address: patient.address,
+        dateOfBirth: patient.dateOfBirth,
         createdAt: patient.createdAt
       }
     });
@@ -138,6 +140,110 @@ export const getMyPatientProfile = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch patient profile.",
+      error: error.message
+    });
+  }
+};
+
+// Update currently logged-in patient profile
+export const updateMyPatientProfile = async (req, res) => {
+  try {
+    const {
+      email,
+      pw,
+      fullName,
+      phone,
+      dateOfBirth,
+      gender,
+      address
+    } = req.body;
+
+    // Get current patient including password only if needed for update
+    const patient = await Patient.findById(req.user.id).select("+pw");
+
+    if (!patient) {
+      return res.status(404).json({
+        message: "Patient not found."
+      });
+    }
+
+    // If email is being changed, check duplicate
+    if (email && email !== patient.email) {
+      const existingPatient = await Patient.findOne({ email });
+
+      if (existingPatient) {
+        return res.status(409).json({
+          message: "Email is already in use by another patient."
+        });
+      }
+
+      patient.email = email;
+    }
+
+    // Update only provided fields
+    if (fullName !== undefined) patient.fullName = fullName;
+    if (phone !== undefined) patient.phone = phone;
+    if (dateOfBirth !== undefined) patient.dateOfBirth = dateOfBirth || null;
+    if (gender !== undefined) patient.gender = gender;
+    if (address !== undefined) patient.address = address;
+
+    // Hash new password only if provided
+    if (pw) {
+      patient.pw = await bcrypt.hash(pw, 10);
+    }
+
+    const updatedPatient = await patient.save();
+
+    // Regenerate token in case email changed
+    const token = generateToken({
+      id: updatedPatient._id,
+      userId: updatedPatient.userId,
+      email: updatedPatient.email,
+      role: "patient"
+    });
+
+    return res.status(200).json({
+      message: "Patient profile updated successfully.",
+      token,
+      patient: {
+        id: updatedPatient._id,
+        userId: updatedPatient.userId,
+        email: updatedPatient.email,
+        fullName: updatedPatient.fullName,
+        phone: updatedPatient.phone,
+        dateOfBirth: updatedPatient.dateOfBirth,
+        gender: updatedPatient.gender,
+        address: updatedPatient.address,
+        updatedAt: updatedPatient.updatedAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to update patient profile.",
+      error: error.message
+    });
+  }
+};
+
+// Delete currently logged-in patient profile
+export const deleteMyPatientProfile = async (req, res) => {
+  try {
+    const patient = await Patient.findById(req.user.id);
+
+    if (!patient) {
+      return res.status(404).json({
+        message: "Patient not found."
+      });
+    }
+
+    await Patient.findByIdAndDelete(req.user.id);
+
+    return res.status(200).json({
+      message: "Patient profile deleted successfully."
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to delete patient profile.",
       error: error.message
     });
   }
