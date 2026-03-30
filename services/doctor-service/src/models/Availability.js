@@ -37,7 +37,15 @@ const slotSchema = new mongoose.Schema(
     isAvailable: {
       type: Boolean,
       default: true
+    },
+    // added maxpatients for a slot window
+    maxPatients: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1
     }
+  
   },
   { timestamps: true }
 );
