@@ -7,21 +7,22 @@ const app = express();
 
 /*
   Important:
-  Do NOT use express.json() before proxy middleware here.
-  If you parse the body first, proxied POST/PUT/PATCH requests
-  can break unless you manually restream the body.
-  Since this gateway mainly forwards requests, keep it lean.
+  This gateway is acting as a reverse proxy.
+  So we do NOT parse request bodies here with express.json()
+  before proxying, because that can interfere with POST/PUT/PATCH
+  forwarding unless the body is re-streamed manually.
 */
 
-// Basic CORS
+// Read allowed CORS origins from env
 const allowedOrigins = (process.env.CORS_ORIGINS || "*")
   .split(",")
-  .map((item) => item.trim());
+  .map((origin) => origin.trim());
 
+// CORS policy
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow Postman / curl / same-machine requests without browser origin
+      // Allow Postman / curl / server-to-server calls
       if (!origin) return callback(null, true);
 
       if (
@@ -36,6 +37,7 @@ app.use(
   })
 );
 
+// Logging
 app.use(morgan("dev"));
 
 // Health route
@@ -52,7 +54,7 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Common proxy factory
+// Reusable proxy builder
 const buildProxy = (target, serviceName) =>
   createProxyMiddleware({
     target,
@@ -70,29 +72,31 @@ const buildProxy = (target, serviceName) =>
     }
   });
 
-// Route proxies
+// Admin routes
 app.use(
   "/api/admin",
   buildProxy(process.env.ADMIN_SERVICE_URL, "admin-service")
 );
 
+// Doctor routes
 app.use(
   "/api/doctors",
   buildProxy(process.env.DOCTOR_SERVICE_URL, "doctor-service")
 );
 
+// Patient routes
 app.use(
   "/api/patients",
   buildProxy(process.env.PATIENT_SERVICE_URL, "patient-service")
 );
 
-// Static uploaded files from patient-service
+// Uploaded files from patient-service
 app.use(
   "/uploads",
   buildProxy(process.env.PATIENT_SERVICE_URL, "patient-service uploads")
 );
 
-// 404
+// 404 fallback
 app.use((_req, res) => {
   res.status(404).json({
     message: "Gateway route not found"
