@@ -1,6 +1,6 @@
 import Doctor from "../models/Doctor.js";
 import Availability from "../models/Availability.js";
-
+import {generateSubSlots} from "../utils/slotGenerator.js";
 // ---------------------------------------------------
 // Helpers
 // ---------------------------------------------------
@@ -8,18 +8,53 @@ import Availability from "../models/Availability.js";
 // Normalize one slot so the API stays flexible
 const normalizeSlot = (slot = {}) => {
   return {
+    _id: slot._id || undefined,
+    type: slot.type || "recurring",
     day: slot.day || "",
     date: slot.date || "",
     startTime: slot.startTime || "",
     endTime: slot.endTime || "",
+    slotDurationMinutes:
+      Number.isInteger(slot.slotDurationMinutes) && slot.slotDurationMinutes > 0
+        ? slot.slotDurationMinutes
+        : 15,
+    bufferMinutes:
+      Number.isInteger(slot.bufferMinutes) && slot.bufferMinutes >= 0
+        ? slot.bufferMinutes
+        : 0,
     mode: slot.mode || slot.consultationMode || "online",
     isAvailable:
       typeof slot.isAvailable === "boolean"
         ? slot.isAvailable
         : typeof slot.available === "boolean"
         ? slot.available
-        : true
+        : true,
+    maxPatientsPerSlot:
+      Number.isInteger(slot.maxPatientsPerSlot) && slot.maxPatientsPerSlot > 0
+        ? slot.maxPatientsPerSlot
+        : Number.isInteger(slot.maxPatients) && slot.maxPatients > 0
+        ? slot.maxPatients
+        : 1
   };
+};
+
+// Generate Sub slots
+const attachGeneratedSubSlots = (slot = {}) => {
+  const normalized = normalizeSlot(slot);
+
+  return {
+    ...normalized,
+    generatedSlots: generateSubSlots(
+      normalized.startTime,
+      normalized.endTime,
+      normalized.slotDurationMinutes,
+      normalized.bufferMinutes
+    )
+  };
+};
+
+const attachGeneratedSubSlotsToArray = (availability = []) => {
+  return normalizeAvailabilityArray(availability).map(attachGeneratedSubSlots);
 };
 
 // Normalize full array
@@ -50,14 +85,47 @@ const toMinutes = (time = "") => {
 
 // Validate one slot
 const isValidSlot = (slot = {}) => {
+  
+  const hasValidType =
+    slot.type === "recurring" || slot.type === "specificDate";
+
+  if (!hasValidType) return false;
+
+  if (slot.type === "recurring" && !slot.day) return false;
+  if (slot.type === "specificDate" && !slot.date) return false;
+  
   if (!slot.day && !slot.date) return false;
   if (!slot.startTime || !slot.endTime) return false;
 
   const start = toMinutes(slot.startTime);
   const end = toMinutes(slot.endTime);
+  
 
   if (start === null || end === null) return false;
   if (start >= end) return false;
+
+  if (
+    !Number.isInteger(slot.slotDurationMinutes) ||
+    slot.slotDurationMinutes < 5
+  ) {
+    return false;
+  }
+
+  if (
+    !Number.isInteger(slot.bufferMinutes) ||
+    slot.bufferMinutes < 0
+  ) {
+    return false;
+  }
+
+  if (
+    !Number.isInteger(slot.maxPatientsPerSlot) ||
+    slot.maxPatientsPerSlot < 1
+  ) {
+    return false;
+  }
+
+  if (slot.slotDurationMinutes > end - start) return false;
 
   return true;
 };
@@ -145,7 +213,7 @@ export const getMyAvailability = async (req, res) => {
 
     return res.status(200).json({
       availability: availabilityDoc
-        ? normalizeAvailabilityArray(availabilityDoc.slots)
+        ? attachGeneratedSubSlotsToArray(availabilityDoc.slots)
         : []
     });
   } catch (error) {
@@ -202,7 +270,7 @@ export const upsertMyAvailability = async (req, res) => {
 
     return res.status(200).json({
       message: "Doctor availability updated successfully.",
-      availability: normalizeAvailabilityArray(updatedAvailability.slots)
+      availability: attachGeneratedSubSlotsToArray(updatedAvailability.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -245,7 +313,7 @@ export const addAvailabilitySlot = async (req, res) => {
 
     return res.status(201).json({
       message: "Availability slot added successfully.",
-      availability: normalizeAvailabilityArray(availabilityDoc.slots)
+      availability: attachGeneratedSubSlotsToArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -312,8 +380,8 @@ export const updateAvailabilitySlot = async (req, res) => {
 
     return res.status(200).json({
       message: "Availability slot updated successfully.",
-      slot: normalizeSlot(availabilityDoc.slots[slotIndex]),
-      availability: normalizeAvailabilityArray(availabilityDoc.slots)
+      slot: attachGeneratedSubSlots(availabilityDoc.slots[slotIndex]),
+      availability: attachGeneratedSubSlotsToArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -361,7 +429,7 @@ export const removeAvailabilitySlot = async (req, res) => {
 
     return res.status(200).json({
       message: "Availability slot removed successfully.",
-      availability: normalizeAvailabilityArray(availabilityDoc.slots)
+      availability: attachGeneratedSubSlotsToArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -411,8 +479,8 @@ export const toggleAvailabilityStatus = async (req, res) => {
 
     return res.status(200).json({
       message: "Availability slot status updated successfully.",
-      slot: normalizeSlot(availabilityDoc.slots[slotIndex]),
-      availability: normalizeAvailabilityArray(availabilityDoc.slots)
+      slot: attachGeneratedSubSlots(availabilityDoc.slots[slotIndex]),
+      availability: attachGeneratedSubSlotsToArray(availabilityDoc.slots)
     });
   } catch (error) {
     return res.status(500).json({
@@ -450,7 +518,7 @@ export const getDoctorAvailabilityById = async (req, res) => {
         specialty: doctor.specialty,
         hospital: doctor.hospital,
         availability: availabilityDoc
-          ? normalizeAvailabilityArray(availabilityDoc.slots)
+          ? attachGeneratedSubSlotsToArray(availabilityDoc.slots)
           : []
       }
     });
@@ -601,7 +669,7 @@ export const getDoctorBookingContextById = async (req, res) => {
         approvalStatus: doctor.approvalStatus,
         isActive: doctor.isActive ?? true,
         availability: availabilityDoc
-          ? normalizeAvailabilityArray(availabilityDoc.slots)
+          ? attachGeneratedSubSlotsToArray(availabilityDoc.slots)
           : []
       }
     });
