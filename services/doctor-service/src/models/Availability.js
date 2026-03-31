@@ -38,14 +38,12 @@ const slotSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
-    // added maxpatients for a slot window
-    maxPatients: {
+    slotDurationMinutes: {
       type: Number,
       required: true,
-      default: 1,
-      min: 1
+      default: 20,
+      enum: [10, 15, 20, 30, 45, 60]
     }
-  
   },
   { timestamps: true }
 );
