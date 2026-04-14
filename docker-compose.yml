@@ -10,7 +10,7 @@ services:
       ADMIN_SERVICE_URL: http://admin-service:5004
       DOCTOR_SERVICE_URL: http://doctor-service:5002
       PATIENT_SERVICE_URL: http://patient-service:5003
-      APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       PAYMENT_SERVICE_URL: http://payment-service:5005
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000
@@ -68,11 +68,11 @@ services:
       context: ./services/appointment-service
     container_name: idoc-appointment-service
     ports:
-      - "5004:5004"
+      - "5007:5007"
     env_file:
       - ./services/appointment-service/.env
     environment:
-      PORT: 5004
+      PORT: 5007
       MONGO_URI: mongodb://idoc-mongodb:27017/idoc_appointment
     depends_on:
       - mongodb
@@ -89,7 +89,7 @@ services:
     environment:
       PORT: 5005
       MONGO_URI: mongodb://idoc-mongodb:27017/idoc_payment
-      APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
     depends_on:
       - appointment-service
