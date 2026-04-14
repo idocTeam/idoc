@@ -42,8 +42,21 @@ const buildAppointmentFilters = (filters = {}) => {
 };
 
 /**
- * Get bookable slots for a doctor on a given date
+ * Mark appointment as paid
  */
+export const markAppointmentPaid = async (appointmentId, amountPaid) => {
+  const appointment = await Appointment.findById(appointmentId);
+
+  if (!appointment) {
+    throw new Error("Appointment not found");
+  }
+
+  appointment.paymentStatus = "paid";
+  appointment.amountPaid = amountPaid;
+  await appointment.save();
+
+  return appointment;
+};
 export const getBookableSlotsForDoctor = async ({
   doctorId,
   date,

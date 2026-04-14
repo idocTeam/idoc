@@ -49,6 +49,9 @@ app.get("/", (_req, res) => {
       admin: "/api/admin",
       doctors: "/api/doctors",
       patients: "/api/patients",
+      appointments: "/api/appointments",
+      payments: "/api/payments",
+      telemedicine: "/api/telemedicine",
       uploads: "/uploads"
     }
   });
@@ -88,6 +91,24 @@ app.use(
 app.use(
   "/api/patients",
   buildProxy(process.env.PATIENT_SERVICE_URL, "patient-service")
+);
+
+// Appointment routes
+app.use(
+  "/api/appointments",
+  buildProxy(process.env.APPOINTMENT_SERVICE_URL, "appointment-service")
+);
+
+// Payment routes
+app.use(
+  "/api/payments",
+  buildProxy(process.env.PAYMENT_SERVICE_URL, "payment-service")
+);
+
+// Telemedicine routes
+app.use(
+  "/api/telemedicine",
+  buildProxy(process.env.TELEMEDICINE_SERVICE_URL, "telemedicine-service")
 );
 
 // Uploaded files from patient-service

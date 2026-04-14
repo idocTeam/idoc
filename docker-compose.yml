@@ -10,11 +10,17 @@ services:
       ADMIN_SERVICE_URL: http://admin-service:5004
       DOCTOR_SERVICE_URL: http://doctor-service:5002
       PATIENT_SERVICE_URL: http://patient-service:5003
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+      PAYMENT_SERVICE_URL: http://payment-service:5005
+      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000
     depends_on:
       - admin-service
       - doctor-service
       - patient-service
+      - appointment-service
+      - payment-service
+      - telemedicine-service
     restart: unless-stopped
 
   admin-service:
@@ -57,5 +63,62 @@ services:
       - patient_uploads:/app/uploads
     restart: unless-stopped
 
+  appointment-service:
+    build:
+      context: ./services/appointment-service
+    container_name: idoc-appointment-service
+    ports:
+      - "5004:5004"
+    env_file:
+      - ./services/appointment-service/.env
+    environment:
+      PORT: 5004
+      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_appointment
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  payment-service:
+    build:
+      context: ./services/payment-service
+    container_name: idoc-payment-service
+    ports:
+      - "5005:5005"
+    env_file:
+      - ./services/payment-service/.env
+    environment:
+      PORT: 5005
+      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_payment
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5004
+      TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
+    depends_on:
+      - appointment-service
+      - mongodb
+    restart: unless-stopped
+
+  telemedicine-service:
+    build:
+      context: ./services/telemedicine-service
+    container_name: idoc-telemedicine-service
+    ports:
+      - "5006:5006"
+    env_file:
+      - ./services/telemedicine-service/.env
+    environment:
+      PORT: 5006
+      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_telemedicine
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:latest
+    container_name: idoc-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
 volumes:
   patient_uploads:
+  mongo_data:

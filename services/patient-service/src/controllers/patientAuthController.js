@@ -248,3 +248,25 @@ export const deleteMyPatientProfile = async (req, res) => {
     });
   }
 };
+
+// Get patient by ID
+export const getPatientById = async (req, res) => {
+  try {
+    const patient = await Patient.findById(req.params.id).select("-pw");
+
+    if (!patient) {
+      return res.status(404).json({
+        message: "Patient not found."
+      });
+    }
+
+    return res.status(200).json({
+      patient
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch patient profile.",
+      error: error.message
+    });
+  }
+};

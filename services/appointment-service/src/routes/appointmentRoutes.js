@@ -14,7 +14,8 @@ import {
   getBookableSlots,
   doctorReschedule,
   acceptDoctorRescheduleController,
-  rejectDoctorRescheduleController
+  rejectDoctorRescheduleController,
+  markPaid
 } from "../controllers/appointmentController.js";
 
 import {
@@ -73,5 +74,10 @@ router.patch("/:id/doctor-reschedule", protectDoctor, doctorReschedule);
  * Patient or doctor who owns the appointment can access it
  */
 router.get("/:id", protectUser, getById);
+
+/**
+ * Internal route for payment success (can be secured via internal IP check or shared secret)
+ */
+router.patch("/:id/mark-paid", markPaid);
 
 export default router;

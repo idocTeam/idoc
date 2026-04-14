@@ -13,8 +13,31 @@ import {
   getBookableSlotsForDoctor,
   doctorRescheduleAppointment,
   acceptDoctorReschedule,
-  rejectDoctorReschedule
+  rejectDoctorReschedule,
+  markAppointmentPaid
 } from "../services/appointmentService.js";
+
+/**
+ * POST /appointments/:id/mark-paid
+ * Mark appointment as paid (internal/webhook call)
+ */
+export const markPaid = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amountPaid } = req.body;
+
+    const appointment = await markAppointmentPaid(id, amountPaid);
+
+    res.status(200).json({
+      message: "Appointment marked as paid",
+      appointment
+    });
+  } catch (err) {
+    res.status(400).json({
+      message: err.message
+    });
+  }
+};
 
 /**
  * POST /appointments

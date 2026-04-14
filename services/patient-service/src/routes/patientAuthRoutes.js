@@ -4,7 +4,8 @@ import {
   loginPatient,
   getMyPatientProfile,
   updateMyPatientProfile,
-  deleteMyPatientProfile
+  deleteMyPatientProfile,
+  getPatientById
 } from "../controllers/patientAuthController.js";
 import { protectPatient } from "../middleware/authMiddleware.js";
 
@@ -24,5 +25,8 @@ router.put("/me", protectPatient, updateMyPatientProfile);
 
 // Delete logged-in patient profile
 router.delete("/me", protectPatient, deleteMyPatientProfile);
+
+// Get patient by ID (Internal/Admin)
+router.get("/:id", getPatientById);
 
 export default router;
