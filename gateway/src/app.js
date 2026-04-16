@@ -1,357 +1,179 @@
 import express from "express";
-
 import cors from "cors";
-
 import morgan from "morgan";
-
 import { createProxyMiddleware } from "http-proxy-middleware";
-
-
 
 const app = express();
 
-
-
 /*
-
   Important:
-
   This gateway is acting as a reverse proxy.
-
   So we do NOT parse request bodies here with express.json()
-
   before proxying, because that can interfere with POST/PUT/PATCH
-
   forwarding unless the body is re-streamed manually.
-
 */
 
-
-
 // Read allowed CORS origins from env
-
 const allowedOrigins = (process.env.CORS_ORIGINS || "*")
-
   .split(",")
-
   .map((origin) => origin.trim());
 
-
-
 // CORS policy
-
 app.use(
-
   cors({
-
     origin: (origin, callback) => {
-
       // Allow Postman / curl / server-to-server calls
-
       if (!origin) return callback(null, true);
 
-
-
       if (
-
         allowedOrigins.includes("*") ||
-
         allowedOrigins.includes(origin)
-
       ) {
-
         return callback(null, true);
-
       }
-
-
 
       return callback(new Error("CORS blocked by API Gateway"));
-
     }
-
   })
-
 );
-
-
 
 // Logging
-
 app.use(morgan("dev"));
 
-
-
 // Health route
-
 app.get("/", (_req, res) => {
-
   res.status(200).json({
-
     service: "api-gateway",
-
     status: "running",
-
     routes: {
-
       admin: "/api/admin",
-
       doctors: "/api/doctors",
-
       patients: "/api/patients",
-
       appointments: "/api/appointments",
-
       payments: "/api/payments",
-
       telemedicine: "/api/telemedicine",
-
       availability: "/api/availability",
-
       uploads: "/uploads"
-
     }
-
   });
-
 });
-
-
 
 // Reusable proxy builder
-
 const buildProxy = (target, serviceName, stripPath = true) => {
-
   const proxyOptions = {
-
     target,
-
     changeOrigin: true,
-
     xfwd: true,
-
     proxyTimeout: 60000,
-
     timeout: 60000,
-
     onError: (err, _req, res) => {
-
       if (!res.headersSent) {
-
         res.status(502).json({
-
           message: `${serviceName} is unavailable through gateway`,
-
           error: err.message
-
         });
-
       }
-
     }
-
   };
 
-
-
   // If stripPath is true, we need to extract the base path from where this is used
-
   // and remove it. However, the pathRewrite needs to be specific.
-
   // To keep it simple, we'll manually specify the path rewrite where needed.
-
   return createProxyMiddleware(proxyOptions);
-
 };
 
-
-
 // Admin routes
-
 app.use(
-
   "/api/admin",
-
   createProxyMiddleware({
-
-    target: process.env.ADMIN_SERVICE_URL || "http://localhost:5001",
-
+    target: process.env.ADMIN_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/admin": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "admin-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Doctor routes
-
 app.use(
-
   "/api/doctors",
-
   createProxyMiddleware({
-
-    target: process.env.DOCTOR_SERVICE_URL || "http://localhost:5002",
-
+    target: process.env.DOCTOR_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/doctors": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "doctor-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Availability routes (part of doctor service)
-
 app.use(
-
   "/api/availability",
-
   createProxyMiddleware({
-
-    target: process.env.DOCTOR_SERVICE_URL || "http://localhost:5002",
-
+    target: process.env.DOCTOR_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/availability": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "availability service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Patient routes
-
 app.use(
-
   "/api/patients",
-
   createProxyMiddleware({
-
-    target: process.env.PATIENT_SERVICE_URL || "http://localhost:5003",
-
+    target: process.env.PATIENT_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/patients": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "patient-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Appointment routes
-
 app.use(
-
   "/api/appointments",
-
   createProxyMiddleware({
-
-    target: process.env.APPOINTMENT_SERVICE_URL || "http://localhost:5004",
-
+    target: process.env.APPOINTMENT_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/appointments": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "appointment-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Payment routes
-
 app.use(
-
   "/api/payments",
-
   createProxyMiddleware({
-
-    target: process.env.PAYMENT_SERVICE_URL || "http://localhost:5005",
-
+    target: process.env.PAYMENT_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/payments": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "payment-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Telemedicine routes
-
 app.use(
-
   "/api/telemedicine",
-
   createProxyMiddleware({
-
-    target: process.env.TELEMEDICINE_SERVICE_URL || "http://localhost:5006",
-
+    target: process.env.TELEMEDICINE_SERVICE_URL,
     changeOrigin: true,
-
     pathRewrite: { "^/api/telemedicine": "" },
-
     onError: (err, req, res) => res.status(502).json({ message: "telemedicine-service unavailable", error: err.message })
-
   })
-
 );
-
-
 
 // Uploaded files from patient-service (don't rewrite /uploads)
-
 app.use(
-
   "/uploads",
-
   createProxyMiddleware({
-
-    target: process.env.PATIENT_SERVICE_URL || "http://localhost:5003",
-
+    target: process.env.PATIENT_SERVICE_URL,
     changeOrigin: true,
-
     onError: (err, req, res) => res.status(502).json({ message: "patient-service uploads unavailable", error: err.message })
-
   })
-
 );
 
-
-
 // 404 fallback
-
 app.use((_req, res) => {
-
   res.status(404).json({
-
     message: "Gateway route not found"
-
   });
-
 });
-
-
 
 export default app;
