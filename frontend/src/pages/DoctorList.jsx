@@ -31,10 +31,14 @@ const DoctorList = () => {
     }
   };
 
-  const filteredDoctors = doctors.filter(doctor => 
-    doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    doctor.specialty.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDoctors = doctors.filter(doctor => {
+    const name = doctor.fullName || '';
+    const specialty = doctor.specialty || '';
+    const search = searchTerm.toLowerCase();
+    
+    return name.toLowerCase().includes(search) ||
+           specialty.toLowerCase().includes(search);
+  });
 
   return (
     <div className="pt-32 pb-20 min-h-screen bg-slate-50">
@@ -89,11 +93,9 @@ const DoctorList = () => {
               >
                 <div className="flex items-start space-x-4 mb-6">
                   <div className="relative">
-                    <img 
-                      src={doctor.image} 
-                      alt={doctor.name} 
-                      className="w-20 h-20 rounded-2xl object-cover"
-                    />
+                    <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center">
+                      <Stethoscope className="w-10 h-10 text-primary-600" />
+                    </div>
                     <div className="absolute -bottom-2 -right-2 bg-white p-1 rounded-lg shadow-sm border border-slate-100">
                       <div className="bg-green-500 w-3 h-3 rounded-full border-2 border-white" />
                     </div>
@@ -104,12 +106,12 @@ const DoctorList = () => {
                       <span className="text-xs font-bold uppercase tracking-wider">{doctor.specialty}</span>
                     </div>
                     <h3 className="text-xl font-bold text-slate-900 group-hover:text-primary-600 transition-colors">
-                      Dr. {doctor.name}
+                      {doctor.fullName}
                     </h3>
                     <div className="flex items-center space-x-1 mt-1">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                      <span className="text-sm font-bold text-slate-700">{doctor.rating}</span>
-                      <span className="text-xs text-slate-400 font-medium">({doctor.reviews} reviews)</span>
+                      <span className="text-sm font-bold text-slate-700">4.9</span>
+                      <span className="text-xs text-slate-400 font-medium">(120 reviews)</span>
                     </div>
                   </div>
                 </div>
@@ -117,18 +119,18 @@ const DoctorList = () => {
                 <div className="space-y-3 mb-8 border-t border-slate-50 pt-4">
                   <div className="flex items-center text-slate-500 space-x-2">
                     <MapPin className="w-4 h-4" />
-                    <span className="text-sm font-medium">{doctor.location}</span>
+                    <span className="text-sm font-medium">{doctor.hospital}</span>
                   </div>
                   <div className="flex items-center text-slate-500 space-x-2">
                     <Clock className="w-4 h-4" />
-                    <span className="text-sm font-medium text-green-600">{doctor.availability}</span>
+                    <span className="text-sm font-medium text-green-600">Available Today</span>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                   <div>
                     <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Consultation</p>
-                    <p className="text-lg font-bold text-slate-900">{doctor.fee}</p>
+                    <p className="text-lg font-bold text-slate-900">${doctor.consultationFee}</p>
                   </div>
                   <Link 
                     to={`/book/${doctor._id}`} 
