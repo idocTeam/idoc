@@ -78,20 +78,73 @@ export const analyzeSymptoms = async (symptomData) => {
   `;
 
   try {
-    const response = await openRouterClient.post('/chat/completions', {
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      response_format: { type: 'json_object' } // Request JSON output if supported by model
-    });
+    // Some providers/models (e.g., certain Gemma variants) reject system/developer instructions.
+    // In that case, fold system instructions into the user message.
+    const modelId = String(OPENROUTER_MODEL || '').toLowerCase();
+    const supportsSystemMessages = !modelId.includes('gemma-3n');
 
-    const content = response.data.choices[0].message.content;
-    
+    const payload = {
+      model: OPENROUTER_MODEL,
+      messages: supportsSystemMessages
+        ? [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        : [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }]
+    };
+
+    // Request JSON output if supported by model/provider. Some providers error on this.
+    if (supportsSystemMessages) {
+      payload.response_format = { type: 'json_object' };
+    }
+
+    const response = await openRouterClient.post('/chat/completions', payload);
+
+    const content = response?.data?.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) {
+      return null;
+    }
+
+    const extractJsonObject = (text) => {
+      const trimmed = text.trim();
+
+      // 1) Fast path: whole response is valid JSON
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        // continue
+      }
+
+      // 2) Common case: JSON wrapped in code fences or extra text
+      // Try to pull the first balanced-ish JSON object by greedy braces.
+      const firstBrace = trimmed.indexOf('{');
+      const lastBrace = trimmed.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const maybeJson = trimmed.slice(firstBrace, lastBrace + 1);
+        try {
+          return JSON.parse(maybeJson);
+        } catch {
+          // continue
+        }
+      }
+
+      // 3) Try code-fence JSON blocks
+      const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (fenceMatch?.[1]) {
+        try {
+          return JSON.parse(fenceMatch[1]);
+        } catch {
+          // ignore
+        }
+      }
+
+      return null;
+    };
+
     // Safely parse JSON from AI response
     try {
-      const parsed = JSON.parse(content);
+      const parsed = extractJsonObject(content);
+      if (!parsed) return null;
       
       // Sanitize output
       return {

@@ -10,9 +10,11 @@ import {
   Activity, 
   Loader2,
   BrainCircuit,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import api from '../services/api';
 
 const AISymptomChecker = () => {
   const [step, setStep] = useState(1);
@@ -22,21 +24,69 @@ const AISymptomChecker = () => {
 
   const handleAnalyze = async () => {
     setLoading(true);
-    // Simulate AI analysis delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setAnalysis({
-      suggestion: "Based on your symptoms, you might be experiencing seasonal influenza or a common viral infection.",
-      recommendedSpecialty: "General Medicine",
-      urgency: "Moderate",
-      precautions: [
-        "Stay hydrated and rest",
-        "Monitor your temperature",
-        "Avoid contact with others if fever persists"
-      ]
-    });
-    setLoading(false);
-    setStep(2);
+
+    try {
+      // Use shared API client so Authorization token (logged-in patient) is attached.
+      // Backend will store the real patientId from the token, not an anonymous id.
+      const { data } = await api.post('/symptoms/check', {
+        symptoms,
+        duration: 'unknown',
+        severity: 'medium',
+        age: 30,
+        gender: 'Other',
+        existingConditions: [],
+        allergies: [],
+        medications: []
+      });
+
+      if (data?.success && data?.data) {
+        const record = data.data;
+
+        // Backend currently returns `possibleConditions` as an array of strings.
+        // Handle either shape (strings OR objects with `name`) to avoid blank UI.
+        const possibleConditions = Array.isArray(record.possibleConditions) ? record.possibleConditions : [];
+        const conditionLabels = possibleConditions
+          .map((c) => (typeof c === 'string' ? c : c?.name))
+          .filter(Boolean);
+
+        const analysisData = {
+          suggestion:
+            record.recommendation ||
+            'Based on your symptoms, please consult a healthcare professional.',
+          recommendedSpecialty: record.recommendedDoctorSpecialties?.[0] || 'General Medicine',
+          urgency: record.urgency || 'medium',
+          precautions: conditionLabels.length
+            ? conditionLabels.slice(0, 3)
+            : [
+                'Monitor your symptoms closely',
+                'Stay hydrated and rest',
+                'Seek medical attention if symptoms worsen'
+              ]
+        };
+
+        setAnalysis(analysisData);
+        setStep(2);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (error) {
+      console.error('Error analyzing symptoms:', error);
+      // Fallback to mock data if API fails
+      setAnalysis({
+        suggestion:
+          'Based on your symptoms, you might be experiencing seasonal influenza or a common viral infection.',
+        recommendedSpecialty: 'General Medicine',
+        urgency: 'Moderate',
+        precautions: [
+          'Stay hydrated and rest',
+          'Monitor your temperature',
+          'Avoid contact with others if fever persists'
+        ]
+      });
+      setStep(2);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

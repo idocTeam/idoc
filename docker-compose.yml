@@ -13,6 +13,7 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       PAYMENT_SERVICE_URL: http://payment-service:5005
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
+      AI_SYMPTOMS_SERVICE_URL: http://ai-symptoms-service:3007
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:80
     depends_on:
       - admin-service
@@ -21,6 +22,7 @@ services:
       - appointment-service
       - payment-service
       - telemedicine-service
+      - ai-symptoms-service
     restart: unless-stopped
 
   frontend:
@@ -121,6 +123,20 @@ services:
     environment:
       PORT: 5006
       MONGO_URI: mongodb://idoc-mongodb:27017/idoc_telemedicine
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  ai-symptoms-service:
+    build:
+      context: ./services/ai-symptoms-service
+    container_name: idoc-ai-symptoms-service
+    ports:
+      - "3007:3007"
+    env_file:
+      - ./services/ai-symptoms-service/.env
+    environment:
+      PORT: 3007
     depends_on:
       - mongodb
     restart: unless-stopped
