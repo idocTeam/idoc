@@ -52,6 +52,7 @@ app.get("/", (_req, res) => {
       appointments: "/api/appointments",
       payments: "/api/payments",
       telemedicine: "/api/telemedicine",
+      availability: "/api/availability",
       uploads: "/uploads"
     }
   });
@@ -100,6 +101,17 @@ app.use(
     changeOrigin: true,
     pathRewrite: { "^/api/doctors": "" },
     onError: (err, req, res) => res.status(502).json({ message: "doctor-service unavailable", error: err.message })
+  })
+);
+
+// Availability routes (part of doctor service)
+app.use(
+  "/api/availability",
+  createProxyMiddleware({
+    target: process.env.DOCTOR_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { "^/api/availability": "" },
+    onError: (err, req, res) => res.status(502).json({ message: "availability service unavailable", error: err.message })
   })
 );
 

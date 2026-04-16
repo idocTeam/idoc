@@ -104,7 +104,7 @@ const Navbar = () => {
                           <Activity className="w-4 h-4" />
                           <span>Dashboard</span>
                         </Link>
-                        <Link to="/profile" className="flex items-center space-x-3 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                        <Link to={user.role === 'doctor' ? '/doctor-profile' : '/profile'} className="flex items-center space-x-3 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                           <User className="w-4 h-4" />
                           <span>Profile Settings</span>
                         </Link>

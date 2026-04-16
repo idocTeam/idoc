@@ -14,6 +14,13 @@ export const doctorService = {
   search: (params) => api.get('/doctors/profile/search', { params }),
   getById: (id) => api.get(`/doctors/profile/${id}`),
   getAvailability: (id, date) => api.get(`/appointments/doctors/${id}/bookable-slots`, { params: { date } }),
+  // Availability management
+  getMyAvailability: () => api.get('/availability/me'),
+  updateMyAvailability: (availability) => api.put('/availability/me', { availability }),
+  addAvailabilitySlot: (slot) => api.post('/availability/me/slot', slot),
+  updateAvailabilitySlot: (index, slot) => api.patch(`/availability/me/slot/${index}`, slot),
+  removeAvailabilitySlot: (index) => api.delete(`/availability/me/slot/${index}`),
+  toggleAvailabilitySlot: (index) => api.patch(`/availability/me/slot/${index}/toggle`),
 };
 
 export const appointmentService = {

@@ -10,6 +10,7 @@ import Booking from './pages/Booking';
 import Dashboard from './pages/Dashboard';
 import Telemedicine from './pages/Telemedicine';
 import Profile from './pages/Profile';
+import DoctorProfile from './pages/DoctorProfile';
 import Reports from './pages/Reports';
 import TicketDetails from './pages/TicketDetails';
 import AISymptomChecker from './pages/AISymptomChecker';
@@ -43,6 +44,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/telemedicine" element={<Telemedicine />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/doctor-profile" element={<DoctorProfile />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/ticket/:appointmentId" element={<TicketDetails />} />
             <Route path="/ai-symptom-checker" element={<AISymptomChecker />} />
