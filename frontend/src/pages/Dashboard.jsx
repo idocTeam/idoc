@@ -12,7 +12,7 @@ import {
   Loader2,
   Stethoscope
 } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { appointmentService, paymentService } from '../services';
 
 const Dashboard = () => {
