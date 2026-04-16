@@ -19,10 +19,14 @@ const Login = () => {
 
     try {
       const service = role === 'patient' ? patientService : doctorService;
-      const { data } = await service.login({ email, password });
+      const { data } = await service.login({ email, pw: password });
       
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({ ...data[role], role, name: data[role].name }));
+      localStorage.setItem('user', JSON.stringify({ 
+        ...data[role], 
+        role, 
+        name: data[role].fullName 
+      }));
       
       navigate('/dashboard');
     } catch (err) {
