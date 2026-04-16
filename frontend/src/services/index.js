@@ -30,6 +30,10 @@ export const appointmentService = {
   accept: (id) => api.patch(`/appointments/${id}/accept`),
   reject: (id) => api.patch(`/appointments/${id}/reject`),
   cancel: (id) => api.patch(`/appointments/${id}/cancel`),
+  getBookableSlots: (doctorId, date, mode) =>
+    api.get(`/appointments/doctors/${doctorId}/bookable-slots`, {
+      params: { date, mode }
+    }),
 };
 
 export const paymentService = {

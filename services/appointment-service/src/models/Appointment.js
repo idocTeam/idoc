@@ -153,7 +153,7 @@ const appointmentSchema = new mongoose.Schema(
 
     consultationType: {
       type: String,
-      enum: ["telemedicine", "physical"],
+      enum: ["online", "physical"],
       required: true
     },
 
