@@ -34,11 +34,23 @@ const createTicketInternal = async (appointmentId) => {
   
   // Get extra info from appointment-service
   let reason = "";
+  let endTime = "";
+  let doctorSpecialty = "";
   try {
       const appointmentResponse = await axios.get(`${process.env.APPOINTMENT_SERVICE_URL}/${appointmentId}`);
-      reason = appointmentResponse.data.appointment.reason;
+      const apt = appointmentResponse.data.appointment;
+      reason = apt.reason || "";
+      endTime = apt.endTime || startTime;
   } catch (err) {
       console.error("Failed to fetch appointment details from:", `${process.env.APPOINTMENT_SERVICE_URL}/${appointmentId}`);
+  }
+
+  // Get doctor specialty from doctor-service
+  try {
+      const doctorResponse = await axios.get(`${process.env.DOCTOR_SERVICE_URL}/profile/${payment.metadata.doctorId}`);
+      doctorSpecialty = doctorResponse.data.doctor.specialty || "";
+  } catch (err) {
+      console.error("Failed to fetch doctor specialty from doctor-service");
   }
 
   // We'll need patient name too. Let's assume we get it from patient-service
@@ -60,11 +72,15 @@ const createTicketInternal = async (appointmentId) => {
     doctorName,
     appointmentDate,
     startTime,
+    endTime,
     jitsiLink,
     amountPaid: payment.amount,
     ticketNumber,
     consultationType,
-    reason
+    reason,
+    doctorSpecialty,
+    transactionId: payment.stripeSessionId || `TXN-${Date.now()}`,
+    bookingDate: payment.createdAt ? new Date(payment.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
   });
 
   await ticket.save();
@@ -127,77 +143,152 @@ export const downloadTicket = async (req, res) => {
       }
     }
 
-    const doc = new PDFDocument({ size: "A4", margin: 50 });
+    const doc = new PDFDocument({ size: "A4", margin: 40 });
 
-    // Set response headers
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=IDOC_Ticket_${ticket.ticketNumber}.pdf`);
 
     doc.pipe(res);
 
-    // Design the PDF
-    // Header
-    doc.rect(0, 0, 595.28, 150).fill("#1e293b"); // Slate 900
-    doc.fillColor("#ffffff").fontSize(24).font("Helvetica-Bold").text("IDOC E-TICKET", 50, 50);
-    doc.fontSize(10).font("Helvetica").text("Your Digital Health Pass", 50, 80);
+    // === DECORATIVE BACKGROUND ===
+    doc.rect(0, 0, 595.28, 842).fill("#f8fafc");
 
-    doc.fillColor("#38bdf8").fontSize(10).font("Helvetica-Bold").text("TICKET NUMBER", 400, 50);
-    doc.fillColor("#ffffff").fontSize(16).font("Courier-Bold").text(ticket.ticketNumber, 400, 65);
+    // === HEADER BANNER ===
+    const headerGradient = doc.linearGradient(0, 0, 595.28, 0);
+    headerGradient.stop(0, "#0f172a");
+    headerGradient.stop(1, "#1e3a5f");
+    doc.rect(0, 0, 595.28, 140).fill(headerGradient);
 
-    // Status Badge
-    doc.rect(400, 100, 140, 30).fill("#22c55e"); // Green 500
-    doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text("CONFIRMED & PAID", 415, 110);
+    // Logo area
+    doc.fillColor("#f87171").fontSize(10).font("Helvetica").text("HEALTHCARE PLATFORM", 50, 30);
+    doc.fillColor("#ffffff").fontSize(28).font("Helvetica-Bold").text("IDOC E-TICKET", 50, 50);
+    doc.fillColor("#94a3b8").fontSize(11).font("Helvetica").text("Your Trusted Healthcare Companion", 50, 82);
 
-    // Content
-    let y = 200;
+    // Ticket number box on right
+    doc.rect(420, 25, 130, 90).fill("#ffffff10");
+    doc.fillColor("#f87171").fontSize(9).font("Helvetica-Bold").text("TICKET NUMBER", 430, 35);
+    doc.fillColor("#ffffff").fontSize(14).font("Courier-Bold").text(ticket.ticketNumber, 430, 52);
 
-    // Patient Details
-    doc.fillColor("#94a3b8").fontSize(10).font("Helvetica-Bold").text("PATIENT DETAILS", 50, y);
-    doc.rect(50, y + 15, 500, 1).fill("#f1f5f9");
+    // Status badge
+    doc.rect(430, 78, 110, 28).fill("#22c55e");
+    doc.fillColor("#ffffff").fontSize(10).font("Helvetica-Bold").text("CONFIRMED", 452, 84);
+
+    // Divider line
+    doc.moveTo(50, 140).lineTo(545, 140).lineWidth(3).strokeColor("#f87171").stroke();
+
+    // === SECTION 1: PATIENT & BOOKING INFO ===
+    let y = 165;
+
+    doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("PATIENT & BOOKING INFORMATION", 50, y);
+    y += 20;
+
+    // Card background
+    doc.rect(50, y, 495, 90).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    y += 15;
+
+    // Patient row
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Patient Name", 70, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.patientName, 70, y + 14);
+
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Booking Date", 300, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.bookingDate || new Date().toLocaleDateString(), 300, y + 14);
+
     y += 40;
 
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Full Name", 50, y);
-    doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(ticket.patientName, 50, y + 15);
+    // Appointment ID row
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Appointment ID", 70, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.appointmentId, 70, y + 14);
 
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Appointment ID", 300, y);
-    doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(ticket.appointmentId, 300, y + 15);
+    y += 75;
 
-    y += 70;
+    // === SECTION 2: DOCTOR & APPOINTMENT DETAILS ===
+    doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("DOCTOR & APPOINTMENT DETAILS", 50, y);
+    y += 20;
 
-    // Consultation Details
-    doc.fillColor("#94a3b8").fontSize(10).font("Helvetica-Bold").text("CONSULTATION DETAILS", 50, y);
-    doc.rect(50, y + 15, 500, 1).fill("#f1f5f9");
+    doc.rect(50, y, 495, 115).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    y += 15;
+
+    // Doctor name and specialty
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Doctor", 70, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(`Dr. ${ticket.doctorName}`, 70, y + 14);
+
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Specialty", 300, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.doctorSpecialty || "General Practice", 300, y + 14);
+
     y += 40;
 
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Specialist", 50, y);
-    doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(`Dr. ${ticket.doctorName}`, 50, y + 15);
+    // Date and time
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Appointment Date", 70, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.appointmentDate, 70, y + 14);
 
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Date & Time", 300, y);
-    doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(`${ticket.appointmentDate} at ${ticket.startTime}`, 300, y + 15);
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Time Slot", 300, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(`${ticket.startTime} - ${ticket.endTime || ticket.startTime}`, 300, y + 14);
 
-    y += 70;
+    y += 40;
 
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Consultation Mode", 50, y);
-    doc.fillColor("#0f172a").fontSize(14).font("Helvetica-Bold").text(ticket.consultationType === "online" ? "Telemedicine" : "Physical Visit", 50, y + 15);
+    // Mode and reason
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Consultation Mode", 70, y);
+    const modeText = ticket.consultationType === "online" ? "Telemedicine (Video Call)" : "Physical Visit";
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(modeText, 70, y + 14);
 
     if (ticket.reason) {
-        doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Reason for visit", 300, y);
-        doc.fillColor("#0f172a").fontSize(12).font("Helvetica").text(ticket.reason, 300, y + 15, { width: 250 });
+      doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Reason for Visit", 300, y);
+      doc.fillColor("#0f172a").fontSize(11).font("Helvetica").text(ticket.reason.substring(0, 30) + (ticket.reason.length > 30 ? "..." : ""), 300, y + 14);
     }
 
-    y += 80;
+    y += 65;
 
-    // Payment Info
-    doc.rect(50, y, 500, 80).fill("#f8fafc");
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica-Bold").text("TOTAL AMOUNT PAID", 70, y + 25);
-    doc.fillColor("#0f172a").fontSize(28).font("Helvetica-Bold").text(`$${ticket.amountPaid}.00`, 70, y + 40);
-    
-    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Currency: USD", 400, y + 45);
+    // === SECTION 3: PAYMENT DETAILS (Receipt Style) ===
+    doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("PAYMENT DETAILS", 50, y);
+    y += 20;
 
-    y += 120;
+    // Receipt card with accent
+    doc.rect(50, y, 495, 100).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    doc.rect(50, y, 8, 100).fill("#f87171");
 
-    // Footer Info
-    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("This e-ticket is digitally signed and serves as your proof of payment and booking. Please keep it ready during your consultation. Thank you for choosing IDOC for your healthcare needs.", 50, y, { width: 500, align: "center" });
+    y += 15;
+
+    // Payment rows
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Consultation Fee", 80, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(`$${ticket.amountPaid}.00`, 420, y, { align: "right", width: 80 });
+
+    y += 22;
+    doc.fillColor("#e2e8f0").rect(70, y, 455, 1).fill();
+
+    y += 15;
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Platform Fee", 80, y);
+    doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text("$0.00", 420, y, { align: "right", width: 80 });
+
+    y += 22;
+    doc.fillColor("#e2e8f0").rect(70, y, 455, 1).fill();
+
+    y += 15;
+    doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Total Amount", 80, y);
+    doc.fillColor("#0f172a").fontSize(16).font("Helvetica-Bold").text(`$${ticket.amountPaid}.00`, 420, y, { align: "right", width: 80 });
+
+    y += 15;
+    doc.fillColor("#22c55e").fontSize(9).font("Helvetica-Bold").text("PAID", 420, y, { align: "right", width: 80 });
+
+    y += 45;
+
+    // === JITS LINK (if telemedicine) ===
+    if (ticket.jitsiLink) {
+      doc.rect(50, y, 495, 50).fill("#f0fdf4").stroke("#bbf7d0").lineWidth(1);
+      doc.fillColor("#22c55e").fontSize(10).font("Helvetica-Bold").text("VIDEO CONSULTATION LINK", 70, y + 10);
+      doc.fillColor("#166534").fontSize(11).font("Helvetica").text(ticket.jitsiLink, 70, y + 28, { width: 455 });
+      y += 65;
+    }
+
+    // === FOOTER ===
+    doc.rect(0, 760, 595.28, 82).fill("#0f172a");
+
+    doc.fillColor("#f87171").fontSize(9).font("Helvetica-Bold").text("IMPORTANT INFORMATION", 50, 775);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Please arrive 15 minutes before your scheduled appointment time.", 50, 792);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Show this e-ticket as proof of your booking and payment.", 50, 806);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• For telemedicine, click the video link above to join your session.", 50, 820);
+
+    doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Generated by IDOC Healthcare Platform", 380, 835);
+    doc.fillColor("#475569").fontSize(8).font("Helvetica").text(new Date().toLocaleString(), 380, 820);
 
     doc.end();
   } catch (err) {
