@@ -23,7 +23,7 @@ export const getPatientProfileFromService = async (token) => {
     }
     return null;
   } catch (error) {
-    console.error('Error fetching patient profile:', error.message);
+    console.error(`Error fetching patient profile from ${PATIENT_SERVICE_URL}:`, error.response?.data || error.message);
     // If the error is 401 or 404, we just return null and fallback to request body data
     if (error.response && [401, 403, 404].includes(error.response.status)) {
       return null;

@@ -8,6 +8,7 @@ const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openrouter/free';
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 
 // Setup axios instance for OpenRouter
+console.log(`Initializing OpenRouter client. Key present: ${!!OPENROUTER_API_KEY}. Key starts with: ${OPENROUTER_API_KEY ? OPENROUTER_API_KEY.substring(0, 10) : 'none'}...`);
 const openRouterClient = axios.create({
   baseURL: OPENROUTER_BASE_URL,
   headers: {
@@ -93,12 +94,9 @@ export const analyzeSymptoms = async (symptomData) => {
         : [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }]
     };
 
-    // Request JSON output if supported by model/provider. Some providers error on this.
-    if (supportsSystemMessages) {
-      payload.response_format = { type: 'json_object' };
-    }
-
+    console.log(`Sending request to OpenRouter using model: ${OPENROUTER_MODEL}`);
     const response = await openRouterClient.post('/chat/completions', payload);
+    console.log('OpenRouter Response Status:', response.status);
 
     const content = response?.data?.choices?.[0]?.message?.content;
     if (typeof content !== 'string' || !content.trim()) {

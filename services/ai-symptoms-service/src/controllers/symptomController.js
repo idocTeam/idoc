@@ -43,6 +43,7 @@ export const checkSymptoms = asyncHandler(async (req, res) => {
   const redFlagsDetected = detectRedFlags(symptoms);
 
   // 4. Call OpenRouter for AI analysis
+  console.log(`Starting AI analysis for symptoms: "${symptoms}"`);
   const aiResult = await analyzeSymptoms({
     symptoms,
     duration,
@@ -53,6 +54,7 @@ export const checkSymptoms = asyncHandler(async (req, res) => {
     allergies,
     medications
   });
+  console.log('AI Analysis Result:', aiResult ? 'Success' : 'Failed (Fallback used)');
 
   // 5. Handle AI result or fallback
   let possibleConditions = [];
@@ -66,6 +68,19 @@ export const checkSymptoms = asyncHandler(async (req, res) => {
     urgency = aiResult.urgency || urgency;
     recommendation = aiResult.recommendation || recommendation;
     recommendedDoctorSpecialties = aiResult.recommendedDoctorSpecialties || recommendedDoctorSpecialties;
+  } else {
+    // Better fallback logic when AI fails (e.g., 401 error)
+    if (redFlagsDetected) {
+      urgency = 'high';
+      recommendation = 'URGENT: Based on your symptoms, please seek immediate medical attention at the nearest emergency room.';
+      recommendedDoctorSpecialties = ['Emergency Medicine', 'General Physician'];
+    } else if (symptoms.toLowerCase().includes('cough') || symptoms.toLowerCase().includes('fever')) {
+      recommendation = 'You seem to have common cold or flu-like symptoms. Please rest, stay hydrated, and consult a doctor if symptoms persist.';
+      recommendedDoctorSpecialties = ['General Physician', 'Pulmonologist'];
+    } else {
+      recommendation = 'Your symptoms require professional evaluation. Please schedule a consultation with a General Physician for a proper checkup.';
+    }
+    console.log('AI Failed - Using smart fallback recommendation');
   }
 
   // 6. Override urgency if red flags are detected
