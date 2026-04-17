@@ -2,12 +2,10 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import {
-  createCheckoutSession,
-  handleWebhook,
-  verifyPayment
-} from "./controllers/paymentController.js";
-import { generateTicket, getTicket } from "./controllers/eTicketController.js";
+import { createCheckoutSession, handleWebhook, verifyPayment } from "./controllers/paymentController.js";
+import { generateTicket, getTicket, downloadTicket } from "./controllers/eTicketController.js";
+
+
 import { protectUser, requireAdmin } from "./middleware/authMiddleware.js";
 import adminFinanceRoutes from "./routes/adminFinanceRoutes.js";
 import axios from "axios";
@@ -28,6 +26,7 @@ app.get("/verify-payment", verifyPayment);
 
 app.post("/generate-ticket/:appointmentId", generateTicket);
 app.get("/ticket/:appointmentId", protectUser, getTicket);
+app.get("/ticket/:appointmentId/download", protectUser, downloadTicket);
 
 app.use("/admin/finance", protectUser, requireAdmin, adminFinanceRoutes);
 

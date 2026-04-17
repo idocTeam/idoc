@@ -127,9 +127,11 @@ services:
       - ./services/telemedicine-service/.env
     environment:
       PORT: 5006
+      APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       #MONGO_URI: mongodb://idoc-mongodb:27017/idoc_telemedicine
     depends_on:
       - mongodb
+      - appointment-service
     restart: unless-stopped
 
   notification-service:

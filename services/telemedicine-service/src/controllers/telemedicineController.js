@@ -111,14 +111,56 @@ export const cancelSession = async (req, res) => {
 
 /**
  * GET /sessions/appointment/:appointmentId
- * Get session details for an appointment
+ * Get session details for an appointment.
+ * Robust fix: Create session on-the-fly if it doesn't exist but appointment is paid.
  */
 export const getSessionByAppointment = async (req, res) => {
   try {
-    const session = await TelemedicineSession.findOne({ appointmentId: req.params.appointmentId });
+    const { appointmentId } = req.params;
+    let session = await TelemedicineSession.findOne({ appointmentId });
 
     if (!session) {
-      return res.status(404).json({ message: "Session not found for this appointment" });
+      console.log(`Session not found for appointment ${appointmentId}. Attempting lazy creation...`);
+      
+      // Try to fetch appointment details to see if we should create a session
+      const APPOINTMENT_SERVICE_URL = process.env.APPOINTMENT_SERVICE_URL || "http://appointment-service:5007";
+      
+      try {
+        // Forward the authorization header if present
+        const config = {};
+        if (req.headers.authorization) {
+          config.headers = { Authorization: req.headers.authorization };
+        }
+
+        const response = await axios.get(`${APPOINTMENT_SERVICE_URL}/${appointmentId}`, config);
+        const appointment = response.data.appointment;
+
+        if (appointment && appointment.paymentStatus === "paid" && appointment.consultationType === "online") {
+          // Generate Jitsi Room ID
+          const jitsiRoomId = `idoc-appointment-${appointmentId}-${uuidv4()}`;
+          const jitsiLink = `${JITSI_BASE_URL}/${jitsiRoomId}`;
+
+          // Create session record
+          session = new TelemedicineSession({
+            appointmentId,
+            patientId: appointment.patientId,
+            doctorId: appointment.doctorId,
+            appointmentDate: appointment.appointmentDate,
+            startTime: appointment.startTime,
+            jitsiRoomId,
+            jitsiLink,
+            status: "scheduled"
+          });
+
+          await session.save();
+          console.log(`Lazy session creation successful for appointment ${appointmentId}`);
+        } else {
+          return res.status(404).json({ message: "Session not found for this appointment" });
+        }
+      } catch (err) {
+        console.error("Error fetching appointment for lazy session creation:", err.message);
+        return res.status(404).json({ message: "Session not found for this appointment" });
+      }
     }
 
     res.status(200).json({ session });
