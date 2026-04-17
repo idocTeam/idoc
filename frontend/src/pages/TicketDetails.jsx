@@ -19,6 +19,7 @@ const TicketDetails = () => {
   const { appointmentId } = useParams();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -33,6 +34,25 @@ const TicketDetails = () => {
       setError(err.response?.data?.message || 'E-Ticket not found. Please ensure payment is completed.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      const response = await paymentService.downloadTicket(appointmentId);
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `IDOC_Ticket_${ticket.ticketNumber}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert('Failed to download ticket PDF');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -72,9 +92,13 @@ const TicketDetails = () => {
               <Printer className="w-4 h-4" />
               <span>Print</span>
             </button>
-            <button onClick={() => window.print()} className="btn btn-primary !py-2 !px-4 flex items-center space-x-2">
-              <Download className="w-4 h-4" />
-              <span>Download PDF</span>
+            <button onClick={handleDownload} disabled={downloading} className="btn btn-primary !py-2 !px-4 flex items-center space-x-2">
+              {downloading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>{downloading ? 'Generating...' : 'Download PDF'}</span>
             </button>
           </div>
         </div>
@@ -138,8 +162,22 @@ const TicketDetails = () => {
                     <p className="text-lg font-bold text-slate-900">{ticket.appointmentDate} at {ticket.startTime}</p>
                   </div>
                 </div>
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 bg-primary-50 rounded-2xl flex items-center justify-center"><Video className="text-primary-600 w-7 h-7" /></div>
+                  <div>
+                    <p className="text-sm text-slate-500 font-medium">Mode</p>
+                    <p className="text-lg font-bold text-slate-900 capitalize">{ticket.consultationType === 'online' ? 'Telemedicine' : 'Physical Visit'}</p>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {ticket.reason && (
+              <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Reason for Visit</h4>
+                <p className="text-slate-700 font-medium leading-relaxed">{ticket.reason}</p>
+              </div>
+            )}
 
             {ticket.jitsiLink && (
               <div className="bg-primary-50 rounded-3xl p-8 border border-primary-100 flex flex-col md:flex-row items-center justify-between gap-6">

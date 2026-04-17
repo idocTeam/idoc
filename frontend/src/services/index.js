@@ -76,6 +76,7 @@ export const paymentService = {
       params: { session_id: sessionId, appointmentId }
     }),
   getTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}`),
+  downloadTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}/download`, { responseType: 'blob' }),
 };
 
 export const telemedicineService = {

@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { createCheckoutSession, handleWebhook, verifyPayment } from "./controllers/paymentController.js";
-import { generateTicket, getTicket } from "./controllers/eTicketController.js";
+import { generateTicket, getTicket, downloadTicket } from "./controllers/eTicketController.js";
 import { protectUser } from "./middleware/authMiddleware.js";
 import axios from "axios";
 import Payment from "./models/Payment.js";
@@ -28,6 +28,7 @@ app.get("/verify-payment", verifyPayment);
 // For simplicity, we allow it to be called without protectUser, but it would be better to secure it properly.
 app.post("/generate-ticket/:appointmentId", generateTicket);
 app.get("/ticket/:appointmentId", protectUser, getTicket);
+app.get("/ticket/:appointmentId/download", protectUser, downloadTicket);
 
 // NEW: Simulate successful payment for testing without real Stripe
 app.post("/simulate-success/:appointmentId", async (req, res) => {
