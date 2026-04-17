@@ -1,18 +1,26 @@
 import express from "express";
 import {
   createPrescription,
+  getMyPatientPrescriptions,
+  getMyPatientPrescriptionById,
   getMyIssuedPrescriptions,
   getPrescriptionById,
   getPrescriptionsByPatientId,
   updatePrescription,
   cancelPrescription
 } from "../controllers/prescriptionController.js";
-import { protectDoctor } from "../middleware/authMiddleware.js";
+import { protectDoctor, protectPatient } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // -------------------------------------
-// All prescription routes require doctor login
+// Patient routes
+// -------------------------------------
+router.get("/my", protectPatient, getMyPatientPrescriptions);
+router.get("/my/:id", protectPatient, getMyPatientPrescriptionById);
+
+// -------------------------------------
+// Doctor routes
 // -------------------------------------
 router.use(protectDoctor);
 

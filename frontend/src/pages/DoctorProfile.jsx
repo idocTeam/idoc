@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { doctorService } from '../services';
+import { apiOrigin, doctorService } from '../services';
 import { getStoredUser, updateStoredUser } from '../utils/session';
 
 const DEFAULT_SLOT_FORM = {
@@ -48,13 +48,15 @@ const normalizeDoctorForm = (doctor = {}) => ({
   consultationFee: doctor.consultationFee || '',
   bio: doctor.bio || '',
   approvalStatus: doctor.approvalStatus || 'approved',
+  photoPath: doctor.photoPath || '',
 });
 
 const DoctorProfile = () => {
   const navigate = useNavigate();
   const user = getStoredUser();
 
-  const [profile, setProfile] = useState(normalizeDoctorForm(user || {}));
+  const [savedProfile, setSavedProfile] = useState(normalizeDoctorForm(user || {}));
+  const [draftProfile, setDraftProfile] = useState(normalizeDoctorForm(user || {}));
   const [availability, setAvailability] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,8 @@ const DoctorProfile = () => {
   const [isAddingSlot, setIsAddingSlot] = useState(false);
   const [editingSlotIndex, setEditingSlotIndex] = useState(null);
   const [slotForm, setSlotForm] = useState(DEFAULT_SLOT_FORM);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (user && user.role !== 'doctor') {
@@ -73,7 +77,15 @@ const DoctorProfile = () => {
     fetchDoctorData();
   }, []);
 
-  const initials = useMemo(() => (profile.fullName?.[0] || user?.name?.[0] || 'D').toUpperCase(), [profile.fullName, user?.name]);
+  const viewProfile = isEditing ? draftProfile : savedProfile;
+  const initials = useMemo(() => (viewProfile.fullName?.[0] || user?.name?.[0] || 'D').toUpperCase(), [viewProfile.fullName, user?.name]);
+  const photoUrl = useMemo(() => {
+    const p = viewProfile.photoPath || savedProfile.photoPath;
+    if (!p) return '';
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    // served by doctor-service via gateway: /api/doctors/uploads/...
+    return `${apiOrigin}/api/doctors${p}`;
+  }, [viewProfile.photoPath, savedProfile.photoPath]);
 
   const fetchDoctorData = async () => {
     try {
@@ -84,7 +96,8 @@ const DoctorProfile = () => {
       ]);
 
       const nextProfile = normalizeDoctorForm(profileRes.data.doctor);
-      setProfile(nextProfile);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
       updateStoredUser(profileRes.data.doctor);
 
       const slots = availabilityRes.data?.availability || [];
@@ -104,19 +117,20 @@ const DoctorProfile = () => {
 
     try {
       const payload = {
-        fullName: profile.fullName,
-        phone: profile.phone,
-        specialty: profile.specialty,
-        qualifications: profile.qualifications,
-        hospital: profile.hospital,
-        consultationFee: Number(profile.consultationFee || 0),
-        bio: profile.bio,
-        experienceYears: Number(profile.experienceYears || 0),
+        fullName: draftProfile.fullName,
+        phone: draftProfile.phone,
+        specialty: draftProfile.specialty,
+        qualifications: draftProfile.qualifications,
+        hospital: draftProfile.hospital,
+        consultationFee: Number(draftProfile.consultationFee || 0),
+        bio: draftProfile.bio,
+        experienceYears: Number(draftProfile.experienceYears || 0),
       };
 
       const { data } = await doctorService.updateMyProfile(payload);
       const nextProfile = normalizeDoctorForm(data.doctor);
-      setProfile(nextProfile);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
       updateStoredUser(data.doctor);
       setMessage({ type: 'success', content: 'Doctor profile updated successfully!' });
       setIsEditing(false);
@@ -124,6 +138,46 @@ const DoctorProfile = () => {
       setMessage({ type: 'error', content: err.response?.data?.message || 'Failed to update doctor profile.' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEditing = () => {
+    setDraftProfile(savedProfile);
+    setIsEditing(true);
+    setMessage({ type: '', content: '' });
+  };
+
+  const cancelEditing = () => {
+    setDraftProfile(savedProfile);
+    setIsEditing(false);
+    setMessage({ type: '', content: '' });
+  };
+
+  const handlePhotoPick = () => {
+    if (!isEditing) startEditing();
+    fileInputRef.current?.click?.();
+  };
+
+  const handlePhotoSelected = async (file) => {
+    if (!file) return;
+    try {
+      setPhotoUploading(true);
+      setMessage({ type: '', content: '' });
+      const fd = new FormData();
+      fd.append('photo', file);
+      const { data } = await doctorService.uploadMyPhoto(fd);
+      const nextProfile = normalizeDoctorForm(data.doctor);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
+      updateStoredUser(data.doctor);
+      setMessage({ type: 'success', content: 'Profile photo updated.' });
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        content: err.response?.data?.message || 'Failed to upload profile photo.',
+      });
+    } finally {
+      setPhotoUploading(false);
     }
   };
 
@@ -219,27 +273,44 @@ const DoctorProfile = () => {
           <div className="space-y-6">
             <div className="card text-center p-8 space-y-6">
               <div className="relative inline-block">
-                <div className="w-32 h-32 bg-primary-100 rounded-[40px] flex items-center justify-center text-4xl font-bold text-primary-700 border-4 border-white shadow-xl">
-                  {initials}
+                <div className="w-32 h-32 bg-primary-100 rounded-[40px] overflow-hidden flex items-center justify-center text-4xl font-bold text-primary-700 border-4 border-white shadow-xl">
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Doctor profile" className="w-full h-full object-cover" />
+                  ) : (
+                    initials
+                  )}
                 </div>
-                <button type="button" className="absolute -bottom-2 -right-2 bg-white p-2.5 rounded-2xl shadow-lg border border-slate-100 text-primary-600">
-                  <Camera className="w-5 h-5" />
+                <button
+                  type="button"
+                  onClick={handlePhotoPick}
+                  disabled={photoUploading}
+                  className="absolute -bottom-2 -right-2 bg-white p-2.5 rounded-2xl shadow-lg border border-slate-100 text-primary-600 disabled:opacity-60"
+                  title="Upload photo"
+                >
+                  {photoUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => handlePhotoSelected(e.target.files?.[0] || null)}
+                />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">{profile.fullName}</h2>
-                <p className="text-slate-500 font-medium">{profile.specialty}</p>
-                <p className="text-sm text-slate-400">{profile.hospital}</p>
+                <h2 className="text-2xl font-bold text-slate-900">{viewProfile.fullName}</h2>
+                <p className="text-slate-500 font-medium">{viewProfile.specialty}</p>
+                <p className="text-sm text-slate-400">{viewProfile.hospital}</p>
               </div>
               <div className="pt-6 border-t border-slate-50 flex justify-around">
                 <div className="text-center">
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Experience</p>
-                  <p className="text-lg font-bold text-slate-900">{profile.experienceYears || 0} years</p>
+                  <p className="text-lg font-bold text-slate-900">{viewProfile.experienceYears || 0} years</p>
                 </div>
                 <div className="w-px bg-slate-100 h-10" />
                 <div className="text-center">
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Approval</p>
-                  <p className="text-lg font-bold text-green-600 capitalize">{profile.approvalStatus}</p>
+                  <p className="text-lg font-bold text-green-600 capitalize">{viewProfile.approvalStatus}</p>
                 </div>
               </div>
             </div>
@@ -257,7 +328,11 @@ const DoctorProfile = () => {
             <div className="card p-8 lg:p-10">
               <div className="flex items-center justify-between mb-10">
                 <h3 className="text-xl font-bold text-slate-900">Profile Information</h3>
-                <button type="button" onClick={() => setIsEditing((prev) => !prev)} className={`text-sm font-bold transition-colors ${isEditing ? 'text-red-600' : 'text-primary-600'}`}>
+                <button
+                  type="button"
+                  onClick={isEditing ? cancelEditing : startEditing}
+                  className={`text-sm font-bold transition-colors ${isEditing ? 'text-red-600' : 'text-primary-600'}`}
+                >
                   {isEditing ? 'Cancel Editing' : 'Edit Profile'}
                 </button>
               </div>
@@ -282,8 +357,8 @@ const DoctorProfile = () => {
                           type={type}
                           disabled={disabled || !isEditing}
                           className="input pl-12 disabled:bg-slate-50 disabled:text-slate-500"
-                          value={profile[key]}
-                          onChange={(e) => setProfile((prev) => ({ ...prev, [key]: e.target.value }))}
+                          value={draftProfile[key]}
+                          onChange={(e) => setDraftProfile((prev) => ({ ...prev, [key]: e.target.value }))}
                         />
                       </div>
                     </div>
@@ -292,7 +367,7 @@ const DoctorProfile = () => {
 
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-700 ml-1">Biography</label>
-                  <textarea disabled={!isEditing} rows={4} className="input py-4 disabled:bg-slate-50 disabled:text-slate-500 resize-none" value={profile.bio} onChange={(e) => setProfile((prev) => ({ ...prev, bio: e.target.value }))} />
+                  <textarea disabled={!isEditing} rows={4} className="input py-4 disabled:bg-slate-50 disabled:text-slate-500 resize-none" value={draftProfile.bio} onChange={(e) => setDraftProfile((prev) => ({ ...prev, bio: e.target.value }))} />
                 </div>
 
                 {isEditing && (
