@@ -18,6 +18,15 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('userManagement');
@@ -186,17 +195,74 @@ const AdminDashboard = () => {
   };
 
   const filteredTransactions = (data) => {
+    const normalizedSearch = searchTerm.toLowerCase();
     return data.filter((item) =>
-      (item._id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.patientId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.doctorName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.doctorId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.appointmentId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (item.status || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (item._id || '').toLowerCase().includes(normalizedSearch) ||
+      (item.patientName || '').toLowerCase().includes(normalizedSearch) ||
+      (item.patientId || '').toLowerCase().includes(normalizedSearch) ||
+      (item.doctorName || '').toLowerCase().includes(normalizedSearch) ||
+      (item.doctorId || '').toLowerCase().includes(normalizedSearch) ||
+      (item.appointmentId || '').toLowerCase().includes(normalizedSearch) ||
+      (item.status || '').toLowerCase().includes(normalizedSearch) ||
+      (getPatientName(item).toLowerCase().includes(normalizedSearch)) ||
+      (getDoctorName(item).toLowerCase().includes(normalizedSearch))
     );
   };
 
+  const getPatientName = (item) => {
+    if (item.patientName) return item.patientName;
+    const transactionPatientId = String(item.patientId || item.metadata?.patientId || '').trim();
+    const matchedPatient = patients.find((patient) => {
+      const patientMongoId = String(patient._id || '').trim();
+      const patientUserId = String(patient.userId || '').trim();
+      return patientMongoId === transactionPatientId || patientUserId === transactionPatientId;
+    });
+    return matchedPatient?.fullName || matchedPatient?.name || '-';
+  };
+
+  const getDoctorName = (item) => {
+    if (item.doctorName) return item.doctorName;
+    if (item.metadata?.doctorName) return item.metadata.doctorName;
+
+    const transactionDoctorId = String(item.doctorId || item.metadata?.doctorId || '').trim();
+    const allDoctors = [...pendingDoctors, ...approvedDoctors];
+    const matchedDoctor = allDoctors.find((doctor) => {
+      const doctorMongoId = String(doctor._id || '').trim();
+      const doctorUserId = String(doctor.userId || '').trim();
+      const doctorId = String(doctor.id || '').trim();
+      return (
+        doctorMongoId === transactionDoctorId ||
+        doctorUserId === transactionDoctorId ||
+        doctorId === transactionDoctorId
+      );
+    });
+    return matchedDoctor?.fullName || matchedDoctor?.name || '-';
+  };
+
   const formatMoney = (amount) => `$${Number(amount || 0).toFixed(2)}`;
+
+  const getDailyRevenueData = () => {
+    const revenueByDay = transactions.reduce((acc, item) => {
+      if (item.status !== 'completed') return acc;
+
+      const dateSource = item.paidAt || item.createdAt;
+      if (!dateSource) return acc;
+
+      const date = new Date(dateSource);
+      if (Number.isNaN(date.getTime())) return acc;
+
+      const dayKey = date.toISOString().split('T')[0];
+      acc[dayKey] = (acc[dayKey] || 0) + Number(item.amount || 0);
+      return acc;
+    }, {});
+
+    return Object.keys(revenueByDay)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .map((dayKey) => ({
+        day: new Date(dayKey).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: Number(revenueByDay[dayKey].toFixed(2))
+      }));
+  };
 
   const renderSectionButton = (sectionKey, label, Icon) => {
     const isActive = activeSection === sectionKey;
@@ -361,10 +427,9 @@ const AdminDashboard = () => {
                   <p className="text-xs text-slate-500">{item.provider || 'stripe'}</p>
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-700">{item.appointmentId}</td>
-                <td className="px-6 py-4 text-sm text-slate-700">{item.patientId}</td>
+                <td className="px-6 py-4 text-sm text-slate-700">{getPatientName(item)}</td>
                 <td className="px-6 py-4">
-                  <p className="text-sm font-bold text-slate-900">{item.doctorName || '-'}</p>
-                  <p className="text-xs text-slate-500">{item.doctorId || '-'}</p>
+                  <p className="text-sm font-bold text-slate-900">{getDoctorName(item)}</p>
                 </td>
                 <td className="px-6 py-4 text-sm font-bold text-slate-900">{formatMoney(item.amount)}</td>
                 <td className="px-6 py-4">
@@ -530,30 +595,64 @@ const AdminDashboard = () => {
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Revenue</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.totalRevenue)}</h3>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Total Revenue</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.totalRevenue)}</h3>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Today Revenue</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.todayRevenue)}</h3>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Monthly Revenue</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.monthlyRevenue)}</h3>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Completed Payments</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.completedCount || 0}</h3>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Pending Payments</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.pendingCount || 0}</h3>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                      <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Failed Payments</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.failedCount || 0}</h3>
+                    </div>
                   </div>
+
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Today Revenue</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.todayRevenue)}</h3>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Monthly Revenue</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{formatMoney(financeSummary.monthlyRevenue)}</h3>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Completed Payments</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.completedCount || 0}</h3>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Pending Payments</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.pendingCount || 0}</h3>
-                  </div>
-                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">Failed Payments</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-2">{financeSummary.failedCount || 0}</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-base font-bold text-slate-900">Revenue by Day</h4>
+                      <p className="text-xs text-slate-500">X-axis: day, Y-axis: revenue</p>
+                    </div>
+
+                    {getDailyRevenueData().length > 0 ? (
+                      <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={getDailyRevenueData()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="day" />
+                            <YAxis tickFormatter={(value) => `$${value}`} />
+                            <Tooltip formatter={(value) => formatMoney(value)} />
+                            <Line
+                              type="monotone"
+                              dataKey="revenue"
+                              stroke="#0ea5e9"
+                              strokeWidth={3}
+                              dot={{ r: 4 }}
+                              activeDot={{ r: 6 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-72 flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50">
+                        <p className="text-sm text-slate-500">No completed payment data available to plot daily revenue.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
