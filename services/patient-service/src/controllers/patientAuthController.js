@@ -249,10 +249,21 @@ export const deleteMyPatientProfile = async (req, res) => {
   }
 };
 
-// Get patient by ID
+// Get patient by ID (supports MongoDB _id and custom userId)
 export const getPatientById = async (req, res) => {
   try {
-    const patient = await Patient.findById(req.params.id).select("-pw");
+    const { id } = req.params;
+    let patient;
+
+    // Check if it's a valid MongoDB ObjectId
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      patient = await Patient.findById(id).select("-pw");
+    }
+
+    // If not found by _id, try custom userId (PAT-...)
+    if (!patient) {
+      patient = await Patient.findOne({ userId: id }).select("-pw");
+    }
 
     if (!patient) {
       return res.status(404).json({

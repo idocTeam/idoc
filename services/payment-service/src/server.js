@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { createCheckoutSession, handleWebhook } from "./controllers/paymentController.js";
+import { createCheckoutSession, handleWebhook, verifyPayment } from "./controllers/paymentController.js";
 import { generateTicket, getTicket } from "./controllers/eTicketController.js";
 import { protectUser } from "./middleware/authMiddleware.js";
 import axios from "axios";
@@ -22,6 +22,7 @@ app.use(express.json());
 
 // Routes
 app.post("/create-checkout-session", protectUser, createCheckoutSession);
+app.get("/verify-payment", verifyPayment);
 
 // Note: generate-ticket is called by both webhook (internal) and patient-facing (optional)
 // For simplicity, we allow it to be called without protectUser, but it would be better to secure it properly.

@@ -25,14 +25,19 @@ export const markPaid = async (req, res) => {
   try {
     const { id } = req.params;
     const { amountPaid } = req.body;
+    
+    console.log(`Marking appointment ${id} as paid. Amount: ${amountPaid}`);
 
     const appointment = await markAppointmentPaid(id, amountPaid);
+
+    console.log(`Appointment ${id} successfully marked as paid`);
 
     res.status(200).json({
       message: "Appointment marked as paid",
       appointment
     });
   } catch (err) {
+    console.error(`Error marking appointment ${req.params.id} as paid:`, err.message);
     res.status(400).json({
       message: err.message
     });

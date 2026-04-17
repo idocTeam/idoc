@@ -16,7 +16,17 @@ const deleteFileIfExists = (filePath) => {
 // Build full file URL for browser download/view
 const buildFileUrl = (req, filePath) => {
   const normalizedPath = filePath.replace(/\\/g, "/");
-  return `${req.protocol}://${req.get("host")}/${normalizedPath}`;
+  // If request is proxied, use the forwarded host/protocol
+  // NOTE: In some environments, req.get("host") might return the internal docker name 
+  // (like patient-service:5003) if the gateway has changeOrigin: true.
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const protocol = req.get("x-forwarded-proto") || req.protocol;
+  
+  let url = `${protocol}://${host}/${normalizedPath}`;
+  
+  // If we detect an internal docker hostname, we can try to fallback to a relative path
+  // or a known gateway address if necessary, but providing a clean URL is best.
+  return url;
 };
 
 // Create new report (patient uploads PDF)
@@ -51,7 +61,7 @@ export const createReport = async (req, res) => {
       reportType,
       patientId: patient.userId,
       fileName: req.file.filename,
-      filePath: req.file.path,
+      filePath: req.file.path.replace(/\\/g, "/"), // Store with forward slashes
       fileUrl: buildFileUrl(req, req.file.path),
       mimeType: req.file.mimetype,
       fileSize: req.file.size

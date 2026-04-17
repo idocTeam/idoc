@@ -14,10 +14,12 @@ import {
   Activity
 } from "lucide-react";
 import { appointmentService, doctorService } from "../services";
+import { getStoredUser } from "../utils/session";
 
 const Booking = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = getStoredUser();
 
   // -----------------------------
   // Page-level loading states
@@ -142,6 +144,7 @@ const Booking = () => {
       await appointmentService.create({
         doctorId: id,
         doctorName: doctor?.fullName,
+        patientName: user?.name || user?.fullName,
         appointmentDate: selectedDate,
 
         // Use actual selected slot values from backend

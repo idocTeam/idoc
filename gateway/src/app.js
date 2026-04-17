@@ -53,6 +53,7 @@ app.get("/", (_req, res) => {
       availability: "/api/availability",
       prescriptions: "/api/prescriptions",
       integrations: "/api/integrations",
+      notifications: "/api/notifications",
       uploads: "/uploads"
     }
   });
@@ -74,6 +75,7 @@ const APPOINTMENT_SERVICE_URL = requireEnv("APPOINTMENT_SERVICE_URL");
 const PAYMENT_SERVICE_URL = requireEnv("PAYMENT_SERVICE_URL");
 const TELEMEDICINE_SERVICE_URL = requireEnv("TELEMEDICINE_SERVICE_URL");
 const AI_SYMPTOMS_SERVICE_URL = requireEnv("AI_SYMPTOMS_SERVICE_URL");
+const NOTIFICATION_SERVICE_URL = requireEnv("NOTIFICATION_SERVICE_URL");
 
 // Admin routes
 app.use(
@@ -161,12 +163,31 @@ app.use(
   })
 );
 
+// Notification routes
+app.use(
+  "/api/notifications",
+  createProxyMiddleware({
+    target: NOTIFICATION_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { "^/api/notifications": "" },
+    on: {
+      error: (err, req, res) => {
+        res.status(502).json({
+          message: "notification-service unavailable",
+          error: err.message
+        });
+      }
+    }
+  })
+);
+
 // Patient routes
 app.use(
   "/api/patients",
   createProxyMiddleware({
     target: PATIENT_SERVICE_URL,
     changeOrigin: true,
+    xfwd: true,
     pathRewrite: { "^/api/patients": "" },
     on: {
       error: (err, req, res) => {
@@ -178,6 +199,7 @@ app.use(
     }
   })
 );
+
 
 // Appointment routes
 app.use(
@@ -255,11 +277,13 @@ app.use(
 );
 
 // Uploaded files from patient-service
+// Uploaded files from patient-service
 app.use(
   "/uploads",
   createProxyMiddleware({
-    target: PATIENT_SERVICE_URL,
+    target: `${PATIENT_SERVICE_URL}/uploads`,
     changeOrigin: true,
+    xfwd: true,
     on: {
       error: (err, req, res) => {
         res.status(502).json({

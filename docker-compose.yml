@@ -13,7 +13,7 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       PAYMENT_SERVICE_URL: http://payment-service:5005
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
-      AI_SYMPTOMS_SERVICE_URL: http://ai-symptoms-service:3007
+      NOTIFICATION_SERVICE_URL: http://notification-service:5008
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost:80
     depends_on:
       - admin-service
@@ -22,7 +22,7 @@ services:
       - appointment-service
       - payment-service
       - telemedicine-service
-      - ai-symptoms-service
+      - notification-service
     restart: unless-stopped
 
   frontend:
@@ -87,10 +87,14 @@ services:
       - ./services/appointment-service/.env
     environment:
       PORT: 5007
-      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_appointment
+      #MONGO_URI: mongodb://idoc-mongodb:27017/idoc_appointment
       DOCTOR_SERVICE_URL: http://doctor-service:5002
+      PATIENT_SERVICE_URL: http://patient-service:5003
+      NOTIFICATION_SERVICE_URL: http://notification-service:5008
     depends_on:
       - mongodb
+      - patient-service
+      - notification-service
     restart: unless-stopped
 
   payment-service:
@@ -103,10 +107,11 @@ services:
       - ./services/payment-service/.env
     environment:
       PORT: 5005
-      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_payment
+      #MONGO_URI: mongodb://idoc-mongodb:27017/idoc_payment
       APPOINTMENT_SERVICE_URL: http://appointment-service:5007
       TELEMEDICINE_SERVICE_URL: http://telemedicine-service:5006
       PATIENT_SERVICE_URL: http://patient-service:5003
+      PAYMENT_SERVICE_URL: http://payment-service:5005
     depends_on:
       - appointment-service
       - mongodb
@@ -122,7 +127,21 @@ services:
       - ./services/telemedicine-service/.env
     environment:
       PORT: 5006
-      MONGO_URI: mongodb://idoc-mongodb:27017/idoc_telemedicine
+      #MONGO_URI: mongodb://idoc-mongodb:27017/idoc_telemedicine
+    depends_on:
+      - mongodb
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ./services/notification-service
+    container_name: idoc-notification-service
+    ports:
+      - "5008:5008"
+    env_file:
+      - ./services/notification-service/.env
+    environment:
+      PORT: 5008
     depends_on:
       - mongodb
     restart: unless-stopped

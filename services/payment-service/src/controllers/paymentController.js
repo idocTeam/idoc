@@ -48,8 +48,8 @@ export const createCheckoutSession = async (req, res) => {
         },
       ],
       mode: "payment",
-      success_url: `${process.env.CLIENT_URL}/payment-success?session_id={CHECKOUT_SESSION_ID}&appointmentId=${appointmentId}`,
-      cancel_url: `${process.env.CLIENT_URL}/payment-cancel?appointmentId=${appointmentId}`,
+      success_url: `${process.env.CLIENT_URL}/#/payment-success?session_id={CHECKOUT_SESSION_ID}&appointmentId=${appointmentId}`,
+      cancel_url: `${process.env.CLIENT_URL}/#/payment-cancel?appointmentId=${appointmentId}`,
       metadata: {
         appointmentId: appointmentId.toString(),
         patientId: req.user.id.toString(),
@@ -86,6 +86,118 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 /**
+ * Helper to update appointment and trigger post-payment actions
+ */
+const completePaymentWorkflow = async (payment, appointmentId) => {
+  console.log(`Starting payment workflow for appointment: ${appointmentId}`);
+  
+  try {
+    // 1. Update Appointment status in appointment-service
+    const appointmentUrl = `${process.env.APPOINTMENT_SERVICE_URL}/${appointmentId}/mark-paid`;
+    console.log(`Calling appointment-service: ${appointmentUrl}`);
+    
+    try {
+      await axios.patch(appointmentUrl, {
+        amountPaid: payment.amount
+      });
+      console.log("Appointment status updated to paid");
+    } catch (aptErr) {
+      console.error("Failed to update appointment status:", aptErr.response?.data || aptErr.message);
+      // If appointment not found, we still want to try other things or at least not throw a generic error
+      throw new Error(`Appointment service error: ${aptErr.response?.data?.message || aptErr.message}`);
+    }
+
+    // 2. Trigger Telemedicine Session creation if it's a telemedicine appointment
+    const consultationType = payment.metadata?.consultationType || "";
+    if (consultationType === "online" || consultationType === "telemedicine") {
+      const telemedicineUrl = `${process.env.TELEMEDICINE_SERVICE_URL}/sessions/create`;
+      console.log(`Calling telemedicine-service: ${telemedicineUrl}`);
+      
+      try {
+        await axios.post(telemedicineUrl, {
+          appointmentId: appointmentId,
+          patientId: payment.patientId,
+          doctorId: payment.metadata?.doctorId,
+          appointmentDate: payment.metadata?.appointmentDate,
+          startTime: payment.metadata?.startTime
+        });
+        console.log("Telemedicine session created");
+      } catch (teleErr) {
+        console.error("Telemedicine session creation failed:", teleErr.response?.data || teleErr.message);
+        // Don't fail the whole workflow for telemedicine session
+      }
+    }
+
+    // 3. Generate E-Ticket automatically
+    const selfUrl = process.env.PAYMENT_SERVICE_URL || `http://localhost:${process.env.PORT || 5005}`;
+    const ticketUrl = `${selfUrl}/generate-ticket/${appointmentId}`;
+    console.log(`Calling generate-ticket: ${ticketUrl}`);
+    
+    try {
+      await axios.post(ticketUrl);
+      console.log("E-Ticket generated");
+    } catch (ticketErr) {
+      console.error("Ticket generation failed:", ticketErr.response?.data || ticketErr.message);
+    }
+
+    console.log(`Payment workflow completed for appointment ${appointmentId}`);
+  } catch (err) {
+    console.error("Error in completePaymentWorkflow:", err.response?.data || err.message);
+    throw new Error(`Workflow failed: ${err.response?.data?.message || err.message}`);
+  }
+};
+
+/**
+ * GET /payments/verify-payment?session_id=xxx&appointmentId=yyy
+ * Fallback for when webhooks are not received (e.g. local dev)
+ */
+export const verifyPayment = async (req, res) => {
+  try {
+    const { session_id, appointmentId } = req.query;
+
+    if (!session_id || !appointmentId) {
+      return res.status(400).json({ message: "session_id and appointmentId are required" });
+    }
+
+    // 1. Check if payment is already marked as completed
+    let payment = await Payment.findOne({ stripeSessionId: session_id });
+
+    if (payment && payment.status === "completed") {
+      return res.status(200).json({ status: "paid", message: "Payment already processed" });
+    }
+
+    // 2. Verify with Stripe
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    if (session.payment_status === "paid") {
+      // Update Payment record if not already done
+      if (!payment) {
+        payment = await Payment.findOne({ appointmentId });
+      }
+
+      if (payment) {
+        payment.status = "completed";
+        payment.paymentIntentId = session.payment_intent;
+        payment.stripeSessionId = session.id;
+        await payment.save();
+
+        // Trigger workflow
+        await completePaymentWorkflow(payment, appointmentId);
+
+        return res.status(200).json({ status: "paid", message: "Payment verified and processed" });
+      } else {
+        return res.status(404).json({ message: "Payment record not found" });
+      }
+    }
+
+    res.status(200).json({ status: "unpaid", message: "Payment not yet confirmed by Stripe" });
+  } catch (err) {
+    console.error("Verify Payment Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/**
  * POST /payments/webhook
  * Handle Stripe webhook for successful payments
  */
@@ -109,45 +221,22 @@ export const handleWebhook = async (req, res) => {
     const session = event.data.object;
     const { appointmentId } = session.metadata;
 
-    // 1. Update Payment record
-    const payment = await Payment.findOneAndUpdate(
-      { stripeSessionId: session.id },
-      {
-        status: "completed",
-        paymentIntentId: session.payment_intent,
-      },
-      { new: true }
-    );
+    try {
+      // 1. Update Payment record
+      const payment = await Payment.findOneAndUpdate(
+        { stripeSessionId: session.id },
+        {
+          status: "completed",
+          paymentIntentId: session.payment_intent,
+        },
+        { new: true }
+      );
 
-    if (payment) {
-      // 2. Update Appointment status in appointment-service
-      // Note: In a real microservices environment, we'd use a message queue (RabbitMQ/Kafka)
-      // Here we use an internal system token or bypass auth if possible, or just call with a dummy token
-      // For simplicity, let's assume we have a system-level communication method
-      try {
-        await axios.patch(`${process.env.APPOINTMENT_SERVICE_URL}/${appointmentId}/mark-paid`, {
-          amountPaid: payment.amount
-        });
-
-        // 3. Trigger Telemedicine Session creation if it's a telemedicine appointment
-        if (payment.metadata.consultationType === "telemedicine") {
-          await axios.post(`${process.env.TELEMEDICINE_SERVICE_URL}/sessions/create`, {
-            appointmentId: appointmentId,
-            patientId: payment.patientId,
-            doctorId: payment.metadata.doctorId,
-            appointmentDate: payment.metadata.appointmentDate,
-            startTime: payment.metadata.startTime
-          });
-        }
-
-        // 4. Generate E-Ticket automatically
-        // Note: In a real scenario, this would be triggered by a message queue
-        // We call our internal function to ensure the ticket is ready
-        await axios.post(`http://localhost:${process.env.PORT}/generate-ticket/${appointmentId}`);
-
-      } catch (err) {
-        console.error("Failed to update appointment, trigger telemedicine, or generate ticket:", err.message);
+      if (payment) {
+        await completePaymentWorkflow(payment, appointmentId);
       }
+    } catch (err) {
+      console.error("Webhook processing failed:", err.message);
     }
   }
 

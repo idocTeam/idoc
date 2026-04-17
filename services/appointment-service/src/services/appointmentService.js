@@ -2,6 +2,8 @@
 
 import Appointment from "../models/Appointment.js";
 import { getDoctorById } from "./doctorClient.js";
+import { getPatientById } from "./patientClient.js";
+import { sendNotification } from "./notificationClient.js";
 import {
   buildBookableSlots,
   countAppointmentsInSlot,
@@ -65,6 +67,8 @@ export const markAppointmentPaid = async (appointmentId, amountPaid) => {
   appointment.amountPaid = amountPaid;
   await appointment.save();
 
+  console.log(`Appointment saved successfully: ${appointment._id} for patient ${patientId}`);
+
   return appointment;
 };
 
@@ -120,7 +124,8 @@ export const createAppointment = async (data, user) => {
     startTime,
     endTime,
     consultationType,
-    reason
+    reason,
+    patientName
   } = data;
 
   const patientId = getAuthenticatedPatientId(user);
@@ -198,10 +203,35 @@ export const createAppointment = async (data, user) => {
     reason,
     status: "pending",
     doctorName: doctor.fullName,
-    doctorSpecialty: doctor.specialty
+    doctorSpecialty: doctor.specialty,
+    patientName: patientName || ""
   });
 
   await appointment.save();
+
+  // Send notification
+  try {
+    const patient = await getPatientById(patientId);
+    if (patient?.email) {
+      await sendNotification({
+        type: "APPOINTMENT_BOOKED",
+        recipient: {
+          email: patient.email,
+          userId: patientId
+        },
+        data: {
+          patientName: patient.fullName || appointment.patientName,
+          doctorName: appointment.doctorName,
+          appointmentDate: appointment.appointmentDate,
+          startTime: appointment.startTime,
+          consultationType: appointment.consultationType,
+          appointmentId: appointment._id
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send booking notification:", error.message);
+  }
 
   return appointment;
 };
@@ -307,6 +337,30 @@ export const acceptAppointment = async (appointmentId, user) => {
   appointment.status = "accepted";
   await appointment.save();
 
+  // Send notification
+  try {
+    const patient = await getPatientById(appointment.patientId);
+    if (patient?.email) {
+      await sendNotification({
+        type: "APPOINTMENT_ACCEPTED",
+        recipient: {
+          email: patient.email,
+          userId: appointment.patientId
+        },
+        data: {
+          patientName: patient.fullName || appointment.patientName,
+          doctorName: appointment.doctorName,
+          appointmentDate: appointment.appointmentDate,
+          startTime: appointment.startTime,
+          consultationType: appointment.consultationType,
+          appointmentId: appointment._id
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send acceptance notification:", error.message);
+  }
+
   return appointment;
 };
 
@@ -332,6 +386,30 @@ export const rejectAppointment = async (appointmentId, user) => {
 
   appointment.status = "rejected";
   await appointment.save();
+
+  // Send notification
+  try {
+    const patient = await getPatientById(appointment.patientId);
+    if (patient?.email) {
+      await sendNotification({
+        type: "APPOINTMENT_REJECTED",
+        recipient: {
+          email: patient.email,
+          userId: appointment.patientId
+        },
+        data: {
+          patientName: patient.fullName || appointment.patientName,
+          doctorName: appointment.doctorName,
+          appointmentDate: appointment.appointmentDate,
+          startTime: appointment.startTime,
+          consultationType: appointment.consultationType,
+          appointmentId: appointment._id
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send rejection notification:", error.message);
+  }
 
   return appointment;
 };
@@ -415,6 +493,30 @@ export const cancelAppointment = async (appointmentId, data, user) => {
   }
 
   await appointment.save();
+
+  // Send notification
+  try {
+    const patient = await getPatientById(patientId);
+    if (patient?.email) {
+      await sendNotification({
+        type: "APPOINTMENT_CANCELLED",
+        recipient: {
+          email: patient.email,
+          userId: patientId
+        },
+        data: {
+          patientName: patient.fullName || appointment.patientName,
+          doctorName: appointment.doctorName,
+          appointmentDate: appointment.appointmentDate,
+          startTime: appointment.startTime,
+          consultationType: appointment.consultationType,
+          appointmentId: appointment._id
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Failed to send cancellation notification:", error.message);
+  }
 
   return {
     appointment,
