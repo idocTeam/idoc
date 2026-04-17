@@ -1,6 +1,8 @@
 import bcrypt from "bcryptjs";
 import Patient from "../models/Patient.js";
 import generateToken from "../utils/generateToken.js";
+import fs from "fs";
+import path from "path";
 
 // Register patient
 export const registerPatient = async (req, res) => {
@@ -54,6 +56,7 @@ export const registerPatient = async (req, res) => {
         phone: patient.phone,
         gender: patient.gender,
         address: patient.address,
+        photoPath: patient.photoPath,
         dateOfBirth: patient.dateOfBirth,
         createdAt: patient.createdAt
       }
@@ -112,7 +115,8 @@ export const loginPatient = async (req, res) => {
         userId: patient.userId,
         email: patient.email,
         fullName: patient.fullName,
-        phone: patient.phone
+        phone: patient.phone,
+        photoPath: patient.photoPath
       }
     });
   } catch (error) {
@@ -214,12 +218,46 @@ export const updateMyPatientProfile = async (req, res) => {
         dateOfBirth: updatedPatient.dateOfBirth,
         gender: updatedPatient.gender,
         address: updatedPatient.address,
+        photoPath: updatedPatient.photoPath,
         updatedAt: updatedPatient.updatedAt
       }
     });
   } catch (error) {
     return res.status(500).json({
       message: "Failed to update patient profile.",
+      error: error.message
+    });
+  }
+};
+
+// Upload currently logged-in patient profile photo
+export const uploadMyPatientPhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Photo file is required." });
+    }
+
+    const patient = await Patient.findById(req.user.id).select("-pw");
+    if (!patient) {
+      return res.status(404).json({ message: "Patient not found." });
+    }
+
+    const oldPath = patient.photoPath ? String(patient.photoPath) : "";
+    if (oldPath.startsWith("/uploads/")) {
+      const diskPath = path.join("uploads", oldPath.replace(/^\/uploads\//, ""));
+      fs.promises.unlink(diskPath).catch(() => {});
+    }
+
+    patient.photoPath = `/uploads/patients/${req.file.filename}`;
+    await patient.save();
+
+    return res.status(200).json({
+      message: "Patient photo uploaded successfully.",
+      patient
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to upload patient photo.",
       error: error.message
     });
   }

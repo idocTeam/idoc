@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Prescription from "../models/Prescription.js";
+import Doctor from "../models/Doctor.js";
 
 // ---------------------------------------------------
 // Helpers
@@ -152,6 +153,108 @@ export const getMyIssuedPrescriptions = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch issued prescriptions.",
+      error: error.message
+    });
+  }
+};
+
+// ---------------------------------------------------
+// Patient: Get my prescriptions
+// ---------------------------------------------------
+
+export const getMyPatientPrescriptions = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, status = "" } = req.query;
+
+    const parsedPage = Math.max(Number(page) || 1, 1);
+    const parsedLimit = Math.max(Number(limit) || 20, 1);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const query = { patientId: req.user.id };
+    if (status) query.status = status;
+
+    const [prescriptions, total] = await Promise.all([
+      Prescription.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parsedLimit),
+      Prescription.countDocuments(query)
+    ]);
+
+    const doctorIds = Array.from(
+      new Set((prescriptions || []).map((p) => String(p?.doctorId || "")).filter(Boolean))
+    );
+
+    const doctors = doctorIds.length
+      ? await Doctor.find({ _id: { $in: doctorIds } }).select("fullName specialty userId")
+      : [];
+
+    const doctorById = new Map(doctors.map((d) => [String(d._id), d]));
+
+    const enriched = (prescriptions || []).map((p) => {
+      const d = doctorById.get(String(p?.doctorId || "")) || null;
+      return {
+        ...p.toObject(),
+        doctor: d
+          ? { id: String(d._id), name: d.fullName, specialty: d.specialty, userId: d.userId }
+          : null
+      };
+    });
+
+    return res.status(200).json({
+      total,
+      page: parsedPage,
+      totalPages: Math.ceil(total / parsedLimit),
+      prescriptions: enriched
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch prescriptions.",
+      error: error.message
+    });
+  }
+};
+
+// ---------------------------------------------------
+// Patient: Get one of my prescriptions by id
+// ---------------------------------------------------
+
+export const getMyPatientPrescriptionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        message: "Invalid prescription ID."
+      });
+    }
+
+    const prescription = await Prescription.findOne({
+      _id: id,
+      patientId: req.user.id
+    });
+
+    if (!prescription) {
+      return res.status(404).json({
+        message: "Prescription not found."
+      });
+    }
+
+    const doctor = prescription?.doctorId
+      ? await Doctor.findById(prescription.doctorId).select("fullName specialty userId")
+      : null;
+
+    return res.status(200).json({
+      prescription: {
+        ...prescription.toObject(),
+        doctor: doctor
+          ? { id: String(doctor._id), name: doctor.fullName, specialty: doctor.specialty, userId: doctor.userId }
+          : null
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch prescription.",
       error: error.message
     });
   }

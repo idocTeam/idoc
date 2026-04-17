@@ -12,12 +12,16 @@ import Telemedicine from './pages/Telemedicine';
 import Profile from './pages/Profile';
 import DoctorProfile from './pages/DoctorProfile';
 import Reports from './pages/Reports';
+import MyPrescriptions from './pages/MyPrescriptions';
+import PrescriptionDetails from './pages/PrescriptionDetails';
 import TicketDetails from './pages/TicketDetails';
 import AISymptomChecker from './pages/AISymptomChecker';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import PaymentStatus from './pages/PaymentStatus';
 import AppointmentDetails from './pages/AppointmentDetails';
+import CreatePrescription from './pages/CreatePrescription';
+import PatientReportsDoctor from './pages/PatientReportsDoctor';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { getStoredToken, getStoredUser } from './utils/session';
 
@@ -108,6 +112,24 @@ function App() {
             />
 
             <Route
+              path="/my-prescriptions"
+              element={
+                <ProtectedRoute roles={['patient']}>
+                  <MyPrescriptions />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/my-prescriptions/:id"
+              element={
+                <ProtectedRoute roles={['patient']}>
+                  <PrescriptionDetails />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/ticket/:appointmentId"
               element={
                 <ProtectedRoute roles={['patient', 'doctor']}>
@@ -121,6 +143,24 @@ function App() {
               element={
                 <ProtectedRoute roles={['patient', 'doctor']}>
                   <AppointmentDetails />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/prescriptions/new"
+              element={
+                <ProtectedRoute roles={['doctor']}>
+                  <CreatePrescription />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/patients/:patientId/reports"
+              element={
+                <ProtectedRoute roles={['doctor']}>
+                  <PatientReportsDoctor />
                 </ProtectedRoute>
               }
             />
