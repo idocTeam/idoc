@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Heart, User, LogOut, Calendar, Activity, Bell, FileText, BrainCircuit, ChevronDown } from 'lucide-react';
+import { Menu, X, Heart, User, LogOut, Calendar, Activity, Bell, FileText, BrainCircuit, ChevronDown, ClipboardList } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = () => {
@@ -111,6 +111,10 @@ const Navbar = () => {
                         <Link to="/reports" className="flex items-center space-x-3 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">
                           <FileText className="w-4 h-4" />
                           <span>Medical Reports</span>
+                        </Link>
+                        <Link to="/my-prescriptions" className="flex items-center space-x-3 px-5 py-3 text-sm font-bold text-slate-600 hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                          <ClipboardList className="w-4 h-4" />
+                          <span>My Prescriptions</span>
                         </Link>
                         <div className="h-px bg-slate-100 my-2 mx-5" />
                         <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-5 py-3 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors">

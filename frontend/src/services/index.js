@@ -15,6 +15,11 @@ export const patientService = {
   uploadReport: (formData) => api.post('/patients/reports', formData),
   updateReport: (reportId, formData) => api.put(`/patients/reports/my/${reportId}`, formData),
   deleteReport: (reportId) => api.delete(`/patients/reports/my/${reportId}`),
+
+  // Doctor/Admin access
+  getReportsByPatientId: (patientId) => api.get(`/patients/reports/doctor/patient/${patientId}`),
+  getReportByPatientIdAndReportId: (patientId, reportId) =>
+    api.get(`/patients/reports/doctor/patient/${patientId}/${reportId}`),
 };
 
 export const doctorService = {
@@ -81,6 +86,19 @@ export const paymentService = {
 
 export const telemedicineService = {
   getSession: (appointmentId) => api.get(`/telemedicine/sessions/appointment/${appointmentId}`),
+};
+
+export const prescriptionService = {
+  create: (payload) => api.post('/prescriptions', payload),
+  getMyIssued: (params) => api.get('/prescriptions/me', { params }),
+  getByPatientId: (patientId, params) => api.get(`/prescriptions/patient/${patientId}`, { params }),
+  getById: (id) => api.get(`/prescriptions/${id}`),
+  update: (id, payload) => api.put(`/prescriptions/${id}`, payload),
+  cancel: (id, payload = {}) => api.patch(`/prescriptions/${id}/cancel`, payload),
+
+  // Patient access (implemented in doctor-service; proxied via gateway)
+  getMyPrescriptions: (params) => api.get('/prescriptions/my', { params }),
+  getMyPrescriptionById: (id) => api.get(`/prescriptions/my/${id}`),
 };
 
 export const adminService = {

@@ -16,6 +16,13 @@ import { useLocation, Link } from 'react-router-dom';
 import { appointmentService, paymentService } from '../services';
 import { getStoredUser } from '../utils/session';
 
+const doctorTabs = [
+  { key: 'pending', label: 'Pending' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'accepted_paid', label: 'Accepted + Paid' },
+  { key: 'rejected', label: 'Rejected' },
+];
+
 const Dashboard = () => {
   const user = getStoredUser();
   const [appointments, setAppointments] = useState([]);
@@ -24,6 +31,7 @@ const Dashboard = () => {
   const [processingPayment, setProcessingPayment] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const location = useLocation();
+  const [doctorTab, setDoctorTab] = useState('pending');
 
   useEffect(() => {
     fetchAppointments();
@@ -33,6 +41,42 @@ const Dashboard = () => {
     () => appointments.filter((item) => !['cancelled', 'rejected', 'completed'].includes(item.status)).length,
     [appointments]
   );
+
+  const doctorBuckets = useMemo(() => {
+    if (user?.role !== 'doctor') return null;
+
+    const base = {
+      pending: [],
+      accepted: [],
+      accepted_paid: [],
+      rejected: [],
+    };
+
+    for (const apt of appointments || []) {
+      if (apt.status === 'pending') base.pending.push(apt);
+      else if (apt.status === 'rejected') base.rejected.push(apt);
+      else if (apt.status === 'accepted' && apt.paymentStatus === 'paid') base.accepted_paid.push(apt);
+      else if (apt.status === 'accepted') base.accepted.push(apt);
+    }
+
+    return base;
+  }, [appointments, user?.role]);
+
+  const doctorCounts = useMemo(() => {
+    if (!doctorBuckets) return null;
+    return {
+      pending: doctorBuckets.pending.length,
+      accepted: doctorBuckets.accepted.length,
+      accepted_paid: doctorBuckets.accepted_paid.length,
+      rejected: doctorBuckets.rejected.length,
+    };
+  }, [doctorBuckets]);
+
+  const visibleAppointments = useMemo(() => {
+    if (user?.role !== 'doctor') return appointments;
+    if (!doctorBuckets) return [];
+    return doctorBuckets[doctorTab] || [];
+  }, [appointments, doctorBuckets, doctorTab, user?.role]);
 
   const fetchAppointments = async () => {
     try {
@@ -159,11 +203,46 @@ const Dashboard = () => {
           </div>
         )}
 
+        {user?.role === 'doctor' && (
+          <div className="mb-8">
+            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+              {doctorTabs.map((t) => {
+                const active = doctorTab === t.key;
+                const count = doctorCounts?.[t.key] ?? 0;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setDoctorTab(t.key)}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                      active ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{t.label}</span>
+                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
+                      active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 text-sm text-slate-500 font-medium">
+              Showing <span className="font-bold text-slate-700">{doctorCounts?.[doctorTab] ?? 0}</span> appointments in{' '}
+              <span className="font-bold text-slate-700">
+                {doctorTabs.find((t) => t.key === doctorTab)?.label || doctorTab}
+              </span>.
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6">
           {loading ? (
             [1, 2].map(i => <div key={i} className="card h-40 animate-pulse bg-slate-100/50" />)
-          ) : appointments.length > 0 ? (
-            appointments.map((apt) => (
+          ) : visibleAppointments.length > 0 ? (
+            visibleAppointments.map((apt) => (
               <motion.div key={apt._id} layout className="card flex flex-col lg:flex-row lg:items-center justify-between gap-6 group hover:border-primary-200 transition-all">
                 <div className="flex items-start space-x-6">
                   <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
@@ -234,8 +313,14 @@ const Dashboard = () => {
                 <Calendar className="text-slate-300 w-10 h-10" />
               </div>
               <div>
-                <h3 className="text-2xl font-bold text-slate-900">No appointments yet</h3>
-                <p className="text-slate-500 mt-2">Your scheduled consultations will appear here.</p>
+                <h3 className="text-2xl font-bold text-slate-900">
+                  {user?.role === 'doctor' ? 'No appointments in this section' : 'No appointments yet'}
+                </h3>
+                <p className="text-slate-500 mt-2">
+                  {user?.role === 'doctor'
+                    ? 'Try switching tabs to view other appointment requests.'
+                    : 'Your scheduled consultations will appear here.'}
+                </p>
               </div>
               {user?.role === 'patient' && (
                 <Link to="/doctors" className="btn btn-primary inline-flex">Book Your First Appointment</Link>
