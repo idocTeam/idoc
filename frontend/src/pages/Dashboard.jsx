@@ -23,6 +23,13 @@ const doctorTabs = [
   { key: 'rejected', label: 'Rejected' },
 ];
 
+const patientTabs = [
+  { key: 'pending', label: 'Pending' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'history', label: 'History' }, // rejected/cancelled/completed
+];
+
 const Dashboard = () => {
   const user = getStoredUser();
   const [appointments, setAppointments] = useState([]);
@@ -32,6 +39,8 @@ const Dashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const location = useLocation();
   const [doctorTab, setDoctorTab] = useState('pending');
+  const [filterDate, setFilterDate] = useState(''); // YYYY-MM-DD
+  const [patientTab, setPatientTab] = useState('pending');
 
   useEffect(() => {
     fetchAppointments();
@@ -62,6 +71,27 @@ const Dashboard = () => {
     return base;
   }, [appointments, user?.role]);
 
+  const patientBuckets = useMemo(() => {
+    if (user?.role !== 'patient') return null;
+
+    const base = {
+      pending: [],
+      accepted: [], // accepted but not paid
+      paid: [], // accepted + paid
+      history: [], // rejected/cancelled/completed + anything else
+    };
+
+    for (const apt of appointments || []) {
+      if (apt.status === 'pending') base.pending.push(apt);
+      else if (apt.status === 'accepted' && apt.paymentStatus === 'paid') base.paid.push(apt);
+      else if (apt.status === 'accepted') base.accepted.push(apt);
+      else if (['rejected', 'cancelled', 'completed'].includes(apt.status)) base.history.push(apt);
+      else base.history.push(apt);
+    }
+
+    return base;
+  }, [appointments, user?.role]);
+
   const doctorCounts = useMemo(() => {
     if (!doctorBuckets) return null;
     return {
@@ -72,11 +102,32 @@ const Dashboard = () => {
     };
   }, [doctorBuckets]);
 
+  const patientCounts = useMemo(() => {
+    if (!patientBuckets) return null;
+    return {
+      pending: patientBuckets.pending.length,
+      accepted: patientBuckets.accepted.length,
+      paid: patientBuckets.paid.length,
+      history: patientBuckets.history.length,
+    };
+  }, [patientBuckets]);
+
   const visibleAppointments = useMemo(() => {
-    if (user?.role !== 'doctor') return appointments;
+    const applyDate = (list) => {
+      const d = String(filterDate || '').trim();
+      if (!d) return list;
+      return (list || []).filter((apt) => String(apt?.appointmentDate || '').slice(0, 10) === d);
+    };
+
+    if (user?.role === 'patient') {
+      if (!patientBuckets) return [];
+      return applyDate(patientBuckets[patientTab] || []);
+    }
+
+    if (user?.role !== 'doctor') return applyDate(appointments);
     if (!doctorBuckets) return [];
-    return doctorBuckets[doctorTab] || [];
-  }, [appointments, doctorBuckets, doctorTab, user?.role]);
+    return applyDate(doctorBuckets[doctorTab] || []);
+  }, [appointments, doctorBuckets, doctorTab, filterDate, patientBuckets, patientTab, user?.role]);
 
   const fetchAppointments = async () => {
     try {
@@ -205,28 +256,48 @@ const Dashboard = () => {
 
         {user?.role === 'doctor' && (
           <div className="mb-8">
-            <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
-              {doctorTabs.map((t) => {
-                const active = doctorTab === t.key;
-                const count = doctorCounts?.[t.key] ?? 0;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setDoctorTab(t.key)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
-                      active ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span>{t.label}</span>
-                    <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
-                      active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-                    }`}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                {doctorTabs.map((t) => {
+                  const active = doctorTab === t.key;
+                  const count = doctorCounts?.[t.key] ?? 0;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setDoctorTab(t.key)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                        active ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{t.label}</span>
+                      <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
+                        active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">Date</div>
+                <input
+                  type="date"
+                  className="input h-11 !py-0"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline h-11 !py-0"
+                  onClick={() => setFilterDate('')}
+                  disabled={!filterDate}
+                >
+                  All
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 text-sm text-slate-500 font-medium">
@@ -234,6 +305,71 @@ const Dashboard = () => {
               <span className="font-bold text-slate-700">
                 {doctorTabs.find((t) => t.key === doctorTab)?.label || doctorTab}
               </span>.
+              {filterDate ? (
+                <>
+                  {' '}Filtered to date <span className="font-bold text-slate-700">{filterDate}</span>.
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {user?.role === 'patient' && (
+          <div className="mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+              <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                {patientTabs.map((t) => {
+                  const active = patientTab === t.key;
+                  const count = patientCounts?.[t.key] ?? 0;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setPatientTab(t.key)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${
+                        active ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{t.label}</span>
+                      <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
+                        active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="px-3 text-xs font-bold uppercase tracking-wider text-slate-400">Date</div>
+                <input
+                  type="date"
+                  className="input h-11 !py-0"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline h-11 !py-0"
+                  onClick={() => setFilterDate('')}
+                  disabled={!filterDate}
+                >
+                  All
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 text-sm text-slate-500 font-medium">
+              Showing <span className="font-bold text-slate-700">{patientCounts?.[patientTab] ?? 0}</span> appointments in{' '}
+              <span className="font-bold text-slate-700">
+                {patientTabs.find((t) => t.key === patientTab)?.label || patientTab}
+              </span>.
+              {filterDate ? (
+                <>
+                  {' '}Filtered to date <span className="font-bold text-slate-700">{filterDate}</span>.
+                </>
+              ) : null}
             </div>
           </div>
         )}
@@ -288,10 +424,12 @@ const Dashboard = () => {
 
                   {apt.paymentStatus === 'paid' && (
                     <div className="flex gap-2 flex-wrap">
-                      <Link to={`/ticket/${apt._id}`} className="btn btn-outline !py-2 !px-4 text-sm flex items-center space-x-2 !text-primary-600 !border-primary-100">
-                        <Ticket className="w-4 h-4" />
-                        <span>Ticket</span>
-                      </Link>
+                      {user?.role === 'patient' && (
+                        <Link to={`/ticket/${apt._id}`} className="btn btn-outline !py-2 !px-4 text-sm flex items-center space-x-2 !text-primary-600 !border-primary-100">
+                          <Ticket className="w-4 h-4" />
+                          <span>Ticket</span>
+                        </Link>
+                      )}
                       {apt.consultationType === 'online' && (
                         <Link to={`/telemedicine?appointmentId=${apt._id}`} className="btn btn-primary !py-2 !px-6 text-sm flex items-center space-x-2 bg-green-600 hover:bg-green-700 shadow-green-100">
                           <Video className="w-4 h-4" />

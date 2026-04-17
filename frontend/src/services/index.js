@@ -27,6 +27,7 @@ export const doctorService = {
   register: (data) => api.post('/doctors/auth/register', data),
   getMyProfile: () => api.get('/doctors/profile/me'),
   updateMyProfile: (data) => api.put('/doctors/profile/me', data),
+  uploadMyPhoto: (formData) => api.post('/doctors/profile/me/photo', formData),
   getById: (id) => api.get(`/doctors/profile/${id}`),
   getPublicById: (id) => api.get(`/doctors/profile/public/${id}`),
 
