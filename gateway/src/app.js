@@ -185,6 +185,7 @@ app.use(
   createProxyMiddleware({
     target: PATIENT_SERVICE_URL,
     changeOrigin: true,
+    xfwd: true,
     pathRewrite: { "^/api/patients": "" },
     on: {
       error: (err, req, res) => {
@@ -196,6 +197,7 @@ app.use(
     }
   })
 );
+
 
 // Appointment routes
 app.use(
@@ -252,11 +254,13 @@ app.use(
 );
 
 // Uploaded files from patient-service
+// Uploaded files from patient-service
 app.use(
   "/uploads",
   createProxyMiddleware({
-    target: PATIENT_SERVICE_URL,
+    target: `${PATIENT_SERVICE_URL}/uploads`,
     changeOrigin: true,
+    xfwd: true,
     on: {
       error: (err, req, res) => {
         res.status(502).json({
