@@ -17,18 +17,21 @@ import {
 import { apiOrigin, patientService } from '../services';
 
 const resolveReportUrl = (report = {}) => {
-  if (!report.filePath) return report.fileUrl || "#";
+  if (report.filePath) {
+    const cleanPath = String(report.filePath)
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
 
-  const cleanPath = String(report.filePath)
-    .replace(/\\/g, "/")
-    .replace(/^\/+/, "");
-
-  // If frontend and gateway are on same domain/origin
-  if (window.location.origin) {
-    return `${window.location.origin}/${cleanPath}`;
+    return `${apiOrigin}/${cleanPath}`;
   }
 
-  return `${apiOrigin}/${cleanPath}`;
+  if (report.fileUrl) {
+    return String(report.fileUrl)
+      .replace("http://patient-service:5003", apiOrigin)
+      .replace("https://patient-service:5003", apiOrigin);
+  }
+
+  return "#";
 };
 
 const Reports = () => {

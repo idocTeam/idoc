@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const APPOINTMENT_SERVICE_URL = process.env.APPOINTMENT_SERVICE_URL || "http://localhost:5004";
+const APPOINTMENT_SERVICE_URL = process.env.APPOINTMENT_SERVICE_URL || "http://localhost:5007";
 
 export const getAppointmentById = async (id, token) => {
   try {
