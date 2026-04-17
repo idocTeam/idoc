@@ -143,7 +143,7 @@ export const downloadTicket = async (req, res) => {
       }
     }
 
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const doc = new PDFDocument({ size: "A4", margin: 0 });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename=IDOC_Ticket_${ticket.ticketNumber}.pdf`);
@@ -180,11 +180,11 @@ export const downloadTicket = async (req, res) => {
     let y = 165;
 
     doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("PATIENT & BOOKING INFORMATION", 50, y);
-    y += 20;
+    y += 18;
 
     // Card background
-    doc.rect(50, y, 495, 90).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
-    y += 15;
+    doc.rect(50, y, 495, 80).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    y += 12;
 
     // Patient row
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Patient Name", 70, y);
@@ -193,20 +193,20 @@ export const downloadTicket = async (req, res) => {
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Booking Date", 300, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.bookingDate || new Date().toLocaleDateString(), 300, y + 14);
 
-    y += 40;
+    y += 38;
 
     // Appointment ID row
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Appointment ID", 70, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.appointmentId, 70, y + 14);
 
-    y += 75;
+    y += 65;
 
     // === SECTION 2: DOCTOR & APPOINTMENT DETAILS ===
     doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("DOCTOR & APPOINTMENT DETAILS", 50, y);
-    y += 20;
+    y += 18;
 
-    doc.rect(50, y, 495, 115).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
-    y += 15;
+    doc.rect(50, y, 495, 110).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    y += 12;
 
     // Doctor name and specialty
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Doctor", 70, y);
@@ -215,7 +215,7 @@ export const downloadTicket = async (req, res) => {
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Specialty", 300, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(ticket.doctorSpecialty || "General Practice", 300, y + 14);
 
-    y += 40;
+    y += 38;
 
     // Date and time
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Appointment Date", 70, y);
@@ -224,7 +224,7 @@ export const downloadTicket = async (req, res) => {
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Time Slot", 300, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(`${ticket.startTime} - ${ticket.endTime || ticket.startTime}`, 300, y + 14);
 
-    y += 40;
+    y += 38;
 
     // Mode and reason
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Consultation Mode", 70, y);
@@ -236,59 +236,59 @@ export const downloadTicket = async (req, res) => {
       doc.fillColor("#0f172a").fontSize(11).font("Helvetica").text(ticket.reason.substring(0, 30) + (ticket.reason.length > 30 ? "..." : ""), 300, y + 14);
     }
 
-    y += 65;
+    y += 60;
 
     // === SECTION 3: PAYMENT DETAILS (Receipt Style) ===
     doc.fillColor("#0f172a").fontSize(11).font("Helvetica-Bold").text("PAYMENT DETAILS", 50, y);
-    y += 20;
+    y += 18;
 
     // Receipt card with accent
-    doc.rect(50, y, 495, 100).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
-    doc.rect(50, y, 8, 100).fill("#f87171");
+    doc.rect(50, y, 495, 90).fill("#ffffff").stroke("#e2e8f0").lineWidth(1);
+    doc.rect(50, y, 8, 90).fill("#f87171");
 
-    y += 15;
+    y += 12;
 
     // Payment rows
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Consultation Fee", 80, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text(`$${ticket.amountPaid}.00`, 420, y, { align: "right", width: 80 });
 
-    y += 22;
+    y += 20;
     doc.fillColor("#e2e8f0").rect(70, y, 455, 1).fill();
 
-    y += 15;
+    y += 12;
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Platform Fee", 80, y);
     doc.fillColor("#0f172a").fontSize(12).font("Helvetica-Bold").text("$0.00", 420, y, { align: "right", width: 80 });
 
-    y += 22;
+    y += 20;
     doc.fillColor("#e2e8f0").rect(70, y, 455, 1).fill();
 
-    y += 15;
+    y += 12;
     doc.fillColor("#64748b").fontSize(10).font("Helvetica").text("Total Amount", 80, y);
     doc.fillColor("#0f172a").fontSize(16).font("Helvetica-Bold").text(`$${ticket.amountPaid}.00`, 420, y, { align: "right", width: 80 });
 
     y += 15;
     doc.fillColor("#22c55e").fontSize(9).font("Helvetica-Bold").text("PAID", 420, y, { align: "right", width: 80 });
 
-    y += 45;
+    y += 40;
 
     // === JITS LINK (if telemedicine) ===
     if (ticket.jitsiLink) {
-      doc.rect(50, y, 495, 50).fill("#f0fdf4").stroke("#bbf7d0").lineWidth(1);
-      doc.fillColor("#22c55e").fontSize(10).font("Helvetica-Bold").text("VIDEO CONSULTATION LINK", 70, y + 10);
-      doc.fillColor("#166534").fontSize(11).font("Helvetica").text(ticket.jitsiLink, 70, y + 28, { width: 455 });
-      y += 65;
+      doc.rect(50, y, 495, 45).fill("#f0fdf4").stroke("#bbf7d0").lineWidth(1);
+      doc.fillColor("#22c55e").fontSize(10).font("Helvetica-Bold").text("VIDEO CONSULTATION LINK", 70, y + 8);
+      doc.fillColor("#166534").fontSize(11).font("Helvetica").text(ticket.jitsiLink, 70, y + 25, { width: 455 });
+      y += 55;
     }
 
     // === FOOTER ===
-    doc.rect(0, 760, 595.28, 82).fill("#0f172a");
+    doc.rect(0, 750, 595.28, 92).fill("#0f172a");
 
-    doc.fillColor("#f87171").fontSize(9).font("Helvetica-Bold").text("IMPORTANT INFORMATION", 50, 775);
-    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Please arrive 15 minutes before your scheduled appointment time.", 50, 792);
-    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Show this e-ticket as proof of your booking and payment.", 50, 806);
-    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• For telemedicine, click the video link above to join your session.", 50, 820);
+    doc.fillColor("#f87171").fontSize(9).font("Helvetica-Bold").text("IMPORTANT INFORMATION", 50, 765);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Please arrive 15 minutes before your scheduled appointment time.", 50, 782);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• Show this e-ticket as proof of your booking and payment.", 50, 796);
+    doc.fillColor("#94a3b8").fontSize(8).font("Helvetica").text("• For telemedicine, click the video link above to join your session.", 50, 810);
 
-    doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Generated by IDOC Healthcare Platform", 380, 835);
-    doc.fillColor("#475569").fontSize(8).font("Helvetica").text(new Date().toLocaleString(), 380, 820);
+    doc.fillColor("#64748b").fontSize(8).font("Helvetica").text("Generated by IDOC Healthcare Platform", 380, 825);
+    doc.fillColor("#475569").fontSize(8).font("Helvetica").text(new Date().toLocaleString(), 380, 810);
 
     doc.end();
   } catch (err) {
