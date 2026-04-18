@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   User,
@@ -14,7 +14,7 @@ import {
   Home,
   VenusAndMars,
 } from 'lucide-react';
-import { patientService } from '../services';
+import { apiOrigin, patientService } from '../services';
 import { getStoredUser, updateStoredUser } from '../utils/session';
 
 const buildProfileForm = (patient = {}) => ({
@@ -23,32 +23,50 @@ const buildProfileForm = (patient = {}) => ({
   phone: patient.phone || '',
   address: patient.address || '',
   dateOfBirth: patient.dateOfBirth ? String(patient.dateOfBirth).slice(0, 10) : '',
-  gender: patient.gender || '',
+  gender: patient.gender ? `${patient.gender}`.charAt(0).toUpperCase() + `${patient.gender}`.slice(1).toLowerCase() : '',
+  photoPath: patient.photoPath || '',
 });
 
 const Profile = () => {
-  const [profile, setProfile] = useState(buildProfileForm(getStoredUser() || {}));
+  const user = getStoredUser();
+  const [savedProfile, setSavedProfile] = useState(buildProfileForm(user || {}));
+  const [draftProfile, setDraftProfile] = useState(buildProfileForm(user || {}));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', content: '' });
   const [isEditing, setIsEditing] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetchProfile();
   }, []);
 
-  const user = getStoredUser();
-  const initials = useMemo(() => (profile.fullName?.[0] || user?.name?.[0] || 'U').toUpperCase(), [profile.fullName, user?.name]);
+  const viewProfile = isEditing ? draftProfile : savedProfile;
+  const initials = useMemo(
+    () => (viewProfile.fullName?.[0] || user?.name?.[0] || 'U').toUpperCase(),
+    [viewProfile.fullName, user?.name]
+  );
+  const photoUrl = useMemo(() => {
+    const p = viewProfile.photoPath || savedProfile.photoPath;
+    if (!p) return '';
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    return `${apiOrigin}${p}`;
+  }, [viewProfile.photoPath, savedProfile.photoPath]);
 
   const fetchProfile = async () => {
     try {
       const { data } = await patientService.getProfile();
-      setProfile(buildProfileForm(data.patient));
+      const nextProfile = buildProfileForm(data.patient);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
       updateStoredUser(data.patient);
     } catch (err) {
       console.error('Failed to load profile', err);
       setMessage({ type: 'error', content: 'Could not load your latest profile. Showing saved session data.' });
-      setProfile(buildProfileForm(user || {}));
+      const fallbackProfile = buildProfileForm(user || {});
+      setSavedProfile(fallbackProfile);
+      setDraftProfile(fallbackProfile);
     } finally {
       setLoading(false);
     }
@@ -61,16 +79,17 @@ const Profile = () => {
 
     try {
       const payload = {
-        fullName: profile.fullName,
-        phone: profile.phone,
-        address: profile.address,
-        dateOfBirth: profile.dateOfBirth || null,
-        gender: profile.gender,
+        fullName: draftProfile.fullName,
+        phone: draftProfile.phone,
+        address: draftProfile.address,
+        dateOfBirth: draftProfile.dateOfBirth || null,
+        gender: draftProfile.gender,
       };
 
       const { data } = await patientService.updateProfile(payload);
       const nextProfile = buildProfileForm(data.patient);
-      setProfile(nextProfile);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
       updateStoredUser(data.patient);
       setMessage({ type: 'success', content: 'Profile updated successfully!' });
       setIsEditing(false);
@@ -81,6 +100,46 @@ const Profile = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEditing = () => {
+    setDraftProfile(savedProfile);
+    setIsEditing(true);
+    setMessage({ type: '', content: '' });
+  };
+
+  const cancelEditing = () => {
+    setDraftProfile(savedProfile);
+    setIsEditing(false);
+    setMessage({ type: '', content: '' });
+  };
+
+  const handlePhotoPick = () => {
+    if (!isEditing) startEditing();
+    fileInputRef.current?.click?.();
+  };
+
+  const handlePhotoSelected = async (file) => {
+    if (!file) return;
+    try {
+      setPhotoUploading(true);
+      setMessage({ type: '', content: '' });
+      const fd = new FormData();
+      fd.append('photo', file);
+      const { data } = await patientService.uploadMyPhoto(fd);
+      const nextProfile = buildProfileForm(data.patient);
+      setSavedProfile(nextProfile);
+      setDraftProfile(nextProfile);
+      updateStoredUser(data.patient);
+      setMessage({ type: 'success', content: 'Profile photo updated.' });
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        content: err.response?.data?.message || 'Failed to upload profile photo.',
+      });
+    } finally {
+      setPhotoUploading(false);
     }
   };
 
@@ -118,20 +177,36 @@ const Profile = () => {
             <div className="card text-center p-8 space-y-6">
               <div className="relative inline-block">
                 <div className="w-32 h-32 bg-primary-100 rounded-[40px] flex items-center justify-center text-4xl font-bold text-primary-700 border-4 border-white shadow-xl">
-                  {initials}
+                  {photoUrl ? (
+                    <img src={photoUrl} alt="Patient profile" className="w-full h-full object-cover rounded-[40px]" />
+                  ) : (
+                    initials
+                  )}
                 </div>
-                <button type="button" className="absolute -bottom-2 -right-2 bg-white p-2.5 rounded-2xl shadow-lg border border-slate-100 text-primary-600">
-                  <Camera className="w-5 h-5" />
+                <button
+                  type="button"
+                  onClick={handlePhotoPick}
+                  disabled={photoUploading}
+                  className="absolute -bottom-2 -right-2 bg-white p-2.5 rounded-2xl shadow-lg border border-slate-100 text-primary-600 disabled:opacity-60"
+                >
+                  {photoUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => handlePhotoSelected(e.target.files?.[0] || null)}
+                />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-slate-900">{profile.fullName || user?.name}</h2>
+                <h2 className="text-2xl font-bold text-slate-900">{viewProfile.fullName || user?.name}</h2>
                 <p className="text-slate-500 font-medium capitalize">Patient</p>
               </div>
               <div className="pt-6 border-t border-slate-50 flex justify-around">
                 <div className="text-center">
                   <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">DOB</p>
-                  <p className="text-lg font-bold text-slate-900">{profile.dateOfBirth || 'N/A'}</p>
+                  <p className="text-lg font-bold text-slate-900">{viewProfile.dateOfBirth || 'N/A'}</p>
                 </div>
                 <div className="w-px bg-slate-100 h-10" />
                 <div className="text-center">
@@ -156,7 +231,7 @@ const Profile = () => {
                 <h3 className="text-xl font-bold text-slate-900">Account Information</h3>
                 <button
                   type="button"
-                  onClick={() => setIsEditing((prev) => !prev)}
+                  onClick={isEditing ? cancelEditing : startEditing}
                   className={`text-sm font-bold transition-colors ${isEditing ? 'text-red-600' : 'text-primary-600'}`}
                 >
                   {isEditing ? 'Cancel Editing' : 'Edit Profile'}
@@ -172,8 +247,8 @@ const Profile = () => {
                       <input
                         disabled={!isEditing}
                         className="input pl-12 disabled:bg-slate-50 disabled:text-slate-500"
-                        value={profile.fullName}
-                        onChange={(e) => setProfile((prev) => ({ ...prev, fullName: e.target.value }))}
+                        value={draftProfile.fullName}
+                        onChange={(e) => setDraftProfile((prev) => ({ ...prev, fullName: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -182,7 +257,7 @@ const Profile = () => {
                     <label className="text-sm font-bold text-slate-700 ml-1">Email Address</label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                      <input disabled className="input pl-12 bg-slate-50 text-slate-500" value={profile.email} />
+                      <input disabled className="input pl-12 bg-slate-50 text-slate-500" value={draftProfile.email} />
                     </div>
                   </div>
 
@@ -193,8 +268,8 @@ const Profile = () => {
                       <input
                         disabled={!isEditing}
                         className="input pl-12 disabled:bg-slate-50 disabled:text-slate-500"
-                        value={profile.phone}
-                        onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))}
+                        value={draftProfile.phone}
+                        onChange={(e) => setDraftProfile((prev) => ({ ...prev, phone: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -207,8 +282,8 @@ const Profile = () => {
                         type="date"
                         disabled={!isEditing}
                         className="input pl-12 disabled:bg-slate-50 disabled:text-slate-500"
-                        value={profile.dateOfBirth}
-                        onChange={(e) => setProfile((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
+                        value={draftProfile.dateOfBirth}
+                        onChange={(e) => setDraftProfile((prev) => ({ ...prev, dateOfBirth: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -220,13 +295,13 @@ const Profile = () => {
                       <select
                         disabled={!isEditing}
                         className="input pl-12 disabled:bg-slate-50 disabled:text-slate-500"
-                        value={profile.gender}
-                        onChange={(e) => setProfile((prev) => ({ ...prev, gender: e.target.value }))}
+                        value={draftProfile.gender}
+                        onChange={(e) => setDraftProfile((prev) => ({ ...prev, gender: e.target.value }))}
                       >
                         <option value="">Select gender</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
                       </select>
                     </div>
                   </div>
@@ -239,8 +314,8 @@ const Profile = () => {
                         disabled={!isEditing}
                         rows={3}
                         className="input pl-12 py-4 disabled:bg-slate-50 disabled:text-slate-500 resize-none"
-                        value={profile.address}
-                        onChange={(e) => setProfile((prev) => ({ ...prev, address: e.target.value }))}
+                        value={draftProfile.address}
+                        onChange={(e) => setDraftProfile((prev) => ({ ...prev, address: e.target.value }))}
                       />
                     </div>
                   </div>

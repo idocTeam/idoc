@@ -17,9 +17,21 @@ import {
 import { apiOrigin, patientService } from '../services';
 
 const resolveReportUrl = (report = {}) => {
-  if (report.fileUrl) return report.fileUrl;
-  if (report.filePath) return `${apiOrigin}/${String(report.filePath).replace(/^\/+/, '')}`;
-  return '#';
+  if (report.filePath) {
+    const cleanPath = String(report.filePath)
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "");
+
+    return `${apiOrigin}/${cleanPath}`;
+  }
+
+  if (report.fileUrl) {
+    return String(report.fileUrl)
+      .replace("http://patient-service:5003", apiOrigin)
+      .replace("https://patient-service:5003", apiOrigin);
+  }
+
+  return "#";
 };
 
 const Reports = () => {

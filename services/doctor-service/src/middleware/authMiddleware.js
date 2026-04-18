@@ -1,6 +1,41 @@
 import jwt from "jsonwebtoken";
 import Doctor from "../models/Doctor.js";
 
+// Protect patient routes using JWT (no DB lookup in this service)
+export const protectPatient = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Not authorized. Token missing."
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    if (decoded.role !== "patient") {
+      return res.status(403).json({
+        message: "Access denied. Patient token required."
+      });
+    }
+
+    req.user = {
+      id: decoded.id,
+      userId: decoded.userId,
+      email: decoded.email,
+      role: "patient"
+    };
+
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired token."
+    });
+  }
+};
+
 // Protect doctor routes using JWT
 export const protectDoctor = async (req, res, next) => {
   try {

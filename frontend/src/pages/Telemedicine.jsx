@@ -46,6 +46,43 @@ const Telemedicine = () => {
     };
   }, [appointmentId]);
 
+  useEffect(() => {
+    if (isJoined && session && !jitsiApiRef.current) {
+      const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+        roomName: session.jitsiRoomId,
+        width: '100%',
+        height: '100%',
+        parentNode: jitsiContainerRef.current,
+        configOverwrite: {
+          prejoinPageEnabled: false,
+          startWithAudioMuted: !controls.mic,
+          startWithVideoMuted: !controls.video,
+        },
+        interfaceConfigOverwrite: {
+          // You can add interface customizations here
+        },
+        userInfo: {
+          displayName: user?.name || 'User',
+        },
+      });
+
+      jitsiApiRef.current = api;
+
+      api.addEventListener('videoConferenceLeft', () => {
+        setIsJoined(false);
+        if (jitsiApiRef.current) {
+          jitsiApiRef.current.dispose();
+          jitsiApiRef.current = null;
+        }
+        navigate('/dashboard', { state: { message: 'Session ended successfully.' } });
+      });
+    }
+
+    return () => {
+      // No-op here, handled by the cleanup in the other useEffect or conference left
+    };
+  }, [isJoined, session, controls.mic, controls.video, user?.name, navigate]);
+
   const fetchSession = async () => {
     try {
       setLoading(true);
@@ -82,35 +119,8 @@ const Telemedicine = () => {
 
   const startMeeting = async () => {
     if (!session) return;
-
     await loadJitsiScript();
-
-    if (jitsiApiRef.current) {
-      jitsiApiRef.current.dispose();
-    }
-
-    const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
-      roomName: session.jitsiRoomId,
-      width: '100%',
-      height: '100%',
-      parentNode: jitsiContainerRef.current,
-      configOverwrite: {
-        prejoinPageEnabled: false,
-        startWithAudioMuted: !controls.mic,
-        startWithVideoMuted: !controls.video,
-      },
-      userInfo: {
-        displayName: user?.name || 'User',
-      },
-    });
-
-    jitsiApiRef.current = api;
     setIsJoined(true);
-
-    api.addEventListener('videoConferenceLeft', () => {
-      setIsJoined(false);
-      navigate('/dashboard', { state: { message: 'Session ended successfully.' } });
-    });
   };
 
   if (loading) {

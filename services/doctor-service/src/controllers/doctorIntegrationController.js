@@ -403,7 +403,7 @@ export const getDoctorDashboardSummary = async (req, res) => {
     const [doctor, activePrescriptionCount, totalPrescriptionCount] =
       await Promise.all([
         Doctor.findById(req.user.id).select(
-          "fullName specialty hospital availability approvalStatus"
+          "fullName specialty hospital availability photoPath approvalStatus"
         ),
         Prescription.countDocuments({
           doctorId: req.user.id,
@@ -468,6 +468,7 @@ export const getDoctorDashboardSummary = async (req, res) => {
           fullName: doctor.fullName,
           specialty: doctor.specialty,
           hospital: doctor.hospital,
+          photoPath: doctor.photoPath,
           approvalStatus: doctor.approvalStatus
         },
 

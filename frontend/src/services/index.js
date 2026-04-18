@@ -7,6 +7,7 @@ export const patientService = {
   register: (data) => api.post('/patients/auth/register', data),
   getProfile: () => api.get('/patients/auth/me'),
   updateProfile: (data) => api.put('/patients/auth/me', data),
+  uploadMyPhoto: (formData) => api.post('/patients/auth/me/photo', formData),
   deleteProfile: () => api.delete('/patients/auth/me'),
   getById: (id) => api.get(`/patients/auth/${id}`),
 
@@ -15,6 +16,11 @@ export const patientService = {
   uploadReport: (formData) => api.post('/patients/reports', formData),
   updateReport: (reportId, formData) => api.put(`/patients/reports/my/${reportId}`, formData),
   deleteReport: (reportId) => api.delete(`/patients/reports/my/${reportId}`),
+
+  // Doctor/Admin access
+  getReportsByPatientId: (patientId) => api.get(`/patients/reports/doctor/patient/${patientId}`),
+  getReportByPatientIdAndReportId: (patientId, reportId) =>
+    api.get(`/patients/reports/doctor/patient/${patientId}/${reportId}`),
 };
 
 export const doctorService = {
@@ -22,6 +28,7 @@ export const doctorService = {
   register: (data) => api.post('/doctors/auth/register', data),
   getMyProfile: () => api.get('/doctors/profile/me'),
   updateMyProfile: (data) => api.put('/doctors/profile/me', data),
+  uploadMyPhoto: (formData) => api.post('/doctors/profile/me/photo', formData),
   getById: (id) => api.get(`/doctors/profile/${id}`),
   getPublicById: (id) => api.get(`/doctors/profile/public/${id}`),
 
@@ -70,25 +77,63 @@ export const appointmentService = {
 };
 
 export const paymentService = {
-  createCheckoutSession: (appointmentId) => api.post('/payments/create-checkout-session', { appointmentId }),
+  createCheckoutSession: (appointmentId) =>
+    api.post('/payments/create-checkout-session', { appointmentId }),
+
   verifyPayment: (sessionId, appointmentId) =>
     api.get('/payments/verify-payment', {
       params: { session_id: sessionId, appointmentId }
     }),
+
   getTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}`),
+  downloadTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}/download`, { responseType: 'blob' }),
+
+  simulateSuccess: (appointmentId) =>
+    api.post(`/payments/simulate-success/${appointmentId}`),
+
+  simulateFailure: (appointmentId, reason = 'Simulated payment failure') =>
+    api.post(`/payments/simulate-failure/${appointmentId}`, { reason }),
 };
 
 export const telemedicineService = {
   getSession: (appointmentId) => api.get(`/telemedicine/sessions/appointment/${appointmentId}`),
 };
 
+export const prescriptionService = {
+  create: (payload) => api.post('/prescriptions', payload),
+  getMyIssued: (params) => api.get('/prescriptions/me', { params }),
+  getByPatientId: (patientId, params) => api.get(`/prescriptions/patient/${patientId}`, { params }),
+  getById: (id) => api.get(`/prescriptions/${id}`),
+  update: (id, payload) => api.put(`/prescriptions/${id}`, payload),
+  cancel: (id, payload = {}) => api.patch(`/prescriptions/${id}/cancel`, payload),
+
+  // Patient access (implemented in doctor-service; proxied via gateway)
+  getMyPrescriptions: (params) => api.get('/prescriptions/my', { params }),
+  getMyPrescriptionById: (id) => api.get(`/prescriptions/my/${id}`),
+};
+
 export const adminService = {
   login: (credentials) => api.post('/admin/auth/login', credentials),
+
   getPendingDoctors: (params) => api.get('/admin/doctors/pending', { params }),
   getApprovedDoctors: (params) => api.get('/admin/doctors/approved', { params }),
   approveDoctor: (id) => api.patch(`/admin/doctors/${id}/approve`),
-  rejectDoctor: (id, rejectionReason) => api.patch(`/admin/doctors/${id}/reject`, { rejectionReason }),
+  rejectDoctor: (id, rejectionReason) =>
+    api.patch(`/admin/doctors/${id}/reject`, { rejectionReason }),
   deleteDoctor: (id) => api.delete(`/admin/doctors/${id}`),
+
   getAllPatients: () => api.get('/admin/patients'),
   deletePatient: (id) => api.delete(`/admin/patients/${id}`),
+
+  // Finance module
+  getFinanceSummary: () => api.get('/payments/admin/finance/summary'),
+
+  getTransactions: (params = {}) =>
+    api.get('/payments/admin/finance/transactions', { params }),
+
+  getTransactionById: (id) =>
+    api.get(`/payments/admin/finance/transactions/${id}`),
+
+  getFailedPayments: (params = {}) =>
+    api.get('/payments/admin/finance/failed-payments', { params }),
 };

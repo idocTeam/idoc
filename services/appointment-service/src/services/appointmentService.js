@@ -67,7 +67,7 @@ export const markAppointmentPaid = async (appointmentId, amountPaid) => {
   appointment.amountPaid = amountPaid;
   await appointment.save();
 
-  console.log(`Appointment saved successfully: ${appointment._id} for patient ${patientId}`);
+  console.log(`Appointment saved successfully: ${appointment._id} for patient ${appointment.patientId}`);
 
   return appointment;
 };

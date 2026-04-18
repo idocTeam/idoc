@@ -16,6 +16,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
+// Static uploads (served via gateway as /api/doctors/uploads/...)
+app.use("/uploads", express.static("uploads"));
+
 // Health route
 app.get("/", (req, res) => {
   res.status(200).json({

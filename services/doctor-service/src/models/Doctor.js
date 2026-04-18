@@ -104,6 +104,12 @@ const doctorSchema = new mongoose.Schema(
     deletedAt: {
       type: Date,
       default: null
+    },
+
+    photoPath: {
+      type: String,
+      default: "",
+      trim: true
     }
   },
   { timestamps: true }

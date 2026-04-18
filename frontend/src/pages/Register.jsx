@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2, Stethoscope } from 'lucide-react';
 import AuthLayout from '../components/layout/AuthLayout';
 import { patientService, doctorService } from '../services';
 import { saveAuthSession } from '../utils/session';
+import { Mail, Lock, User, Phone, ArrowRight, AlertCircle, Loader2, Stethoscope, Camera } from 'lucide-react';
 
 const Register = () => {
   const [role, setRole] = useState('patient');
@@ -19,11 +19,24 @@ const Register = () => {
     bio: 'Experienced doctor specializing in ' + role, // Default value
     experienceYears: '5', // Default value
     medicalLicenseNumber: 'MD' + Math.floor(Math.random() * 100000), // Random default
+    photo: null,
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(null);
   const navigate = useNavigate();
+
+  // Handle photo preview cleanup
+  React.useEffect(() => {
+    if (formData.photo) {
+      const url = URL.createObjectURL(formData.photo);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [formData.photo]);
 
   // Update bio when role or specialty changes
   React.useEffect(() => {
@@ -42,13 +55,26 @@ const Register = () => {
     try {
       const service = role === 'patient' ? patientService : doctorService;
       
-      // Ensure all required fields for doctor are present
-      const submissionData = { ...formData };
+      let submissionData;
+      
       if (role === 'doctor') {
-        submissionData.experienceYears = parseInt(formData.experienceYears);
-        submissionData.consultationFee = parseFloat(formData.consultationFee);
+        submissionData = new FormData();
+        Object.keys(formData).forEach(key => {
+          if (key === 'photo') {
+            if (formData[key]) {
+              submissionData.append('photo', formData[key]);
+            }
+          } else if (key === 'experienceYears') {
+            submissionData.append(key, parseInt(formData[key]));
+          } else if (key === 'consultationFee') {
+            submissionData.append(key, parseFloat(formData[key]));
+          } else {
+            submissionData.append(key, formData[key]);
+          }
+        });
       } else {
-        // Remove doctor specific fields for patient registration
+        // Patients registration remains JSON
+        submissionData = { ...formData };
         delete submissionData.specialty;
         delete submissionData.consultationFee;
         delete submissionData.qualifications;
@@ -56,6 +82,7 @@ const Register = () => {
         delete submissionData.bio;
         delete submissionData.experienceYears;
         delete submissionData.medicalLicenseNumber;
+        delete submissionData.photo;
       }
 
       const { data } = await service.register(submissionData);
@@ -102,7 +129,7 @@ const Register = () => {
       <div className="flex p-1 bg-slate-100 rounded-2xl mb-8">
         <button
           type="button"
-          onClick={() => setRole('patient')}
+          onClick={() => { setRole('patient'); setFormData(prev => ({ ...prev, photo: null })); }}
           className={`flex-1 flex items-center justify-center space-x-2 py-3 rounded-xl text-sm font-bold transition-all ${
             role === 'patient' ? 'bg-white text-primary-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
           }`}
@@ -127,6 +154,38 @@ const Register = () => {
           <div className="p-4 bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl flex items-center space-x-3">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <p>{error}</p>
+          </div>
+        )}
+
+        {role === 'doctor' && (
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700 ml-1">Profile Photo</label>
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400 overflow-hidden border-2 border-dashed border-slate-200">
+                {previewUrl ? (
+                  <img 
+                    src={previewUrl} 
+                    alt="Preview" 
+                    className="w-full h-full object-cover" 
+                  />
+                ) : (
+                  <Camera className="w-6 h-6" />
+                )}
+              </div>
+              <label className="flex-1 cursor-pointer">
+                <div className="bg-white border-2 border-slate-200 border-dashed rounded-2xl p-4 text-center hover:border-primary-500 hover:bg-primary-50/30 transition-all">
+                  <span className="text-sm font-medium text-slate-500">
+                    {formData.photo ? formData.photo.name : 'Click to upload profile photo'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => setFormData({ ...formData, photo: e.target.files[0] })}
+                  />
+                </div>
+              </label>
+            </div>
           </div>
         )}
 
