@@ -38,6 +38,24 @@ const eTicketSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
+    consultationType: {
+      type: String
+    },
+    reason: {
+      type: String
+    },
+    doctorSpecialty: {
+      type: String
+    },
+    endTime: {
+      type: String
+    },
+    transactionId: {
+      type: String
+    },
+    bookingDate: {
+      type: String
+    },
     currency: {
       type: String,
       default: "usd"

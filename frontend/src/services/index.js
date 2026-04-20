@@ -86,6 +86,7 @@ export const paymentService = {
     }),
 
   getTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}`),
+  downloadTicket: (appointmentId) => api.get(`/payments/ticket/${appointmentId}/download`, { responseType: 'blob' }),
 
   simulateSuccess: (appointmentId) =>
     api.post(`/payments/simulate-success/${appointmentId}`),
