@@ -49,6 +49,7 @@ app.get("/", (_req, res) => {
       appointments: "/api/appointments",
       payments: "/api/payments",
       telemedicine: "/api/telemedicine",
+      symptoms: "/api/symptoms",
       availability: "/api/availability",
       prescriptions: "/api/prescriptions",
       integrations: "/api/integrations",
@@ -73,6 +74,7 @@ const PATIENT_SERVICE_URL = requireEnv("PATIENT_SERVICE_URL");
 const APPOINTMENT_SERVICE_URL = requireEnv("APPOINTMENT_SERVICE_URL");
 const PAYMENT_SERVICE_URL = requireEnv("PAYMENT_SERVICE_URL");
 const TELEMEDICINE_SERVICE_URL = requireEnv("TELEMEDICINE_SERVICE_URL");
+const AI_SYMPTOMS_SERVICE_URL = requireEnv("AI_SYMPTOMS_SERVICE_URL");
 const NOTIFICATION_SERVICE_URL = requireEnv("NOTIFICATION_SERVICE_URL");
 
 // Admin routes
@@ -246,6 +248,27 @@ app.use(
       error: (err, req, res) => {
         res.status(502).json({
           message: "telemedicine-service unavailable",
+          error: err.message
+        });
+      }
+    }
+  })
+);
+
+// AI symptom checker routes
+app.use(
+  "/api/symptoms",
+  createProxyMiddleware({
+    // Note: Express strips the mount path (`/api/symptoms`) before the proxy sees it,
+    // so a request to `/api/symptoms/check` becomes `/check` here.
+    // We therefore proxy to `${AI_SYMPTOMS_SERVICE_URL}/api/symptoms` so the upstream
+    // receives `/api/symptoms/check` as expected.
+    target: `${AI_SYMPTOMS_SERVICE_URL}/api/symptoms`,
+    changeOrigin: true,
+    on: {
+      error: (err, req, res) => {
+        res.status(502).json({
+          message: "ai-symptoms-service unavailable",
           error: err.message
         });
       }

@@ -564,7 +564,7 @@ export const filterDoctorsByAvailability = async (req, res) => {
     }
 
     const approvedDoctors = await Doctor.find(buildApprovedDoctorQuery()).select(
-      "fullName specialty qualifications hospital consultationFee bio experienceYears"
+      "fullName specialty qualifications hospital consultationFee bio experienceYears photoPath"
     );
 
     if (approvedDoctors.length === 0) {
@@ -607,6 +607,7 @@ export const filterDoctorsByAvailability = async (req, res) => {
           consultationFee: doctor.consultationFee,
           bio: doctor.bio,
           experienceYears: doctor.experienceYears,
+          photoPath: doctor.photoPath,
           matchedAvailability: matchedSlots
         };
       })
@@ -637,7 +638,7 @@ export const getDoctorBookingContextById = async (req, res) => {
     const { id } = req.params;
 
     const doctor = await Doctor.findById(id).select(
-      "_id fullName specialty hospital approvalStatus isActive"
+      "_id fullName specialty hospital photoPath approvalStatus isActive"
     );
 
     if (!doctor) {
@@ -666,6 +667,7 @@ export const getDoctorBookingContextById = async (req, res) => {
         fullName: doctor.fullName,
         specialty: doctor.specialty,
         hospital: doctor.hospital,
+        photoPath: doctor.photoPath,
         approvalStatus: doctor.approvalStatus,
         isActive: doctor.isActive ?? true,
         availability: availabilityDoc

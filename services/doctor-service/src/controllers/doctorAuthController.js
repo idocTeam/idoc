@@ -69,7 +69,8 @@ export const registerDoctor = async (req, res) => {
       consultationFee,
       bio,
       experienceYears,
-      medicalLicenseNumber
+      medicalLicenseNumber,
+      photoPath: req.file ? `/uploads/doctors/${req.file.filename}` : ""
     });
 
     return res.status(201).json({
@@ -82,6 +83,7 @@ export const registerDoctor = async (req, res) => {
         fullName: doctor.fullName,
         specialty: doctor.specialty,
         hospital: doctor.hospital,
+        photoPath: doctor.photoPath,
         approvalStatus: doctor.approvalStatus,
         createdAt: doctor.createdAt
       }

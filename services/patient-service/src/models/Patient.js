@@ -52,6 +52,11 @@ const patientSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ""
+    },
+
+    photoPath: {
+      type: String,
+      default: ""
     }
   },
   { timestamps: true }

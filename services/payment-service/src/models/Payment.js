@@ -9,15 +9,33 @@ const paymentSchema = new mongoose.Schema(
     },
     patientId: {
       type: String,
-      required: true
+      required: true,
+      index: true
+    },
+    doctorId: {
+      type: String,
+      index: true
+    },
+    doctorName: {
+      type: String,
+      trim: true
     },
     amount: {
       type: Number,
-      required: true
+      required: true,
+      min: 0
     },
     currency: {
       type: String,
       default: "usd"
+    },
+    paymentMethod: {
+      type: String,
+      default: "card"
+    },
+    provider: {
+      type: String,
+      default: "stripe"
     },
     stripeSessionId: {
       type: String,
@@ -26,13 +44,28 @@ const paymentSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: ["pending", "completed", "failed", "refunded"],
-      default: "pending"
+      default: "pending",
+      index: true
     },
     paymentIntentId: {
       type: String
     },
+    paidAt: {
+      type: Date
+    },
+    failedAt: {
+      type: Date
+    },
+    failureReason: {
+      type: String
+    },
+    isTest: {
+      type: Boolean,
+      default: false
+    },
     metadata: {
-      type: Object
+      type: Object,
+      default: {}
     }
   },
   { timestamps: true }

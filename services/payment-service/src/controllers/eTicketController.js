@@ -29,8 +29,9 @@ const createTicketInternal = async (appointmentId) => {
     console.error("No telemedicine session found or service down");
   }
 
-  // 4. Get patient and doctor names from payment metadata
-  const { doctorName, appointmentDate, startTime, consultationType } = payment.metadata;
+  // 4. Get data from payment and metadata
+  const { appointmentDate, startTime, consultationType } = payment.metadata;
+  const { doctorName, doctorId, patientId } = payment;
   
   // Get extra info from appointment-service
   let reason = "";
@@ -47,7 +48,7 @@ const createTicketInternal = async (appointmentId) => {
 
   // Get doctor specialty from doctor-service
   try {
-      const doctorResponse = await axios.get(`${process.env.DOCTOR_SERVICE_URL}/profile/${payment.metadata.doctorId}`);
+      const doctorResponse = await axios.get(`${process.env.DOCTOR_SERVICE_URL}/profile/${doctorId}`);
       doctorSpecialty = doctorResponse.data.doctor.specialty || "";
   } catch (err) {
       console.error("Failed to fetch doctor specialty from doctor-service");
@@ -56,18 +57,18 @@ const createTicketInternal = async (appointmentId) => {
   // We'll need patient name too. Let's assume we get it from patient-service
   let patientName = "Patient";
   try {
-      const patientResponse = await axios.get(`${process.env.PATIENT_SERVICE_URL}/auth/${payment.patientId}`);
+      const patientResponse = await axios.get(`${process.env.PATIENT_SERVICE_URL}/auth/${patientId}`);
       patientName = patientResponse.data.patient.fullName;
   } catch (err) {
-      console.error("Failed to fetch patient name from:", `${process.env.PATIENT_SERVICE_URL}/auth/${payment.patientId}`);
+      console.error("Failed to fetch patient name from:", `${process.env.PATIENT_SERVICE_URL}/auth/${patientId}`);
   }
 
   // 5. Create ETicket
   const ticketNumber = `TKT-${Date.now()}-${uuidv4().substring(0, 8).toUpperCase()}`;
   const ticket = new ETicket({
     appointmentId,
-    patientId: payment.patientId,
-    doctorId: payment.metadata.doctorId,
+    patientId,
+    doctorId,
     patientName,
     doctorName,
     appointmentDate,

@@ -1,4 +1,6 @@
 import Doctor from "../models/Doctor.js";
+import fs from "fs";
+import path from "path";
 
 // Small helper to safely build regex search
 const escapeRegex = (value = "") => {
@@ -7,7 +9,7 @@ const escapeRegex = (value = "") => {
 
 // Public-safe fields for patient-facing responses
 const PUBLIC_DOCTOR_FIELDS =
-  "fullName specialty qualifications hospital consultationFee bio experienceYears availability createdAt updatedAt";
+  "fullName specialty qualifications hospital consultationFee bio experienceYears availability photoPath createdAt updatedAt";
 
 // Internal fields for doctor/internal-service use
 const INTERNAL_DOCTOR_FIELDS =
@@ -97,6 +99,40 @@ export const updateMyDoctorProfile = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Failed to update doctor profile.",
+      error: error.message
+    });
+  }
+};
+
+// Doctor uploads own profile photo
+export const uploadMyDoctorPhoto = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Photo file is required." });
+    }
+
+    const doctor = await Doctor.findById(req.user.id).select(INTERNAL_DOCTOR_FIELDS);
+    if (!doctor) {
+      return res.status(404).json({ message: "Doctor not found." });
+    }
+
+    // If there was a previous photo, try to delete it (best-effort)
+    const oldPath = doctor.photoPath ? String(doctor.photoPath) : "";
+    if (oldPath.startsWith("/uploads/")) {
+      const diskPath = path.join("uploads", oldPath.replace(/^\/uploads\//, ""));
+      fs.promises.unlink(diskPath).catch(() => {});
+    }
+
+    doctor.photoPath = `/uploads/doctors/${req.file.filename}`;
+    await doctor.save();
+
+    return res.status(200).json({
+      message: "Doctor photo uploaded successfully.",
+      doctor
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to upload doctor photo.",
       error: error.message
     });
   }

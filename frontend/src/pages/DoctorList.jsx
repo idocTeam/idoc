@@ -2,13 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, MapPin, Star, Clock, Filter, ChevronRight, Stethoscope } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { doctorService } from '../services';
+import { doctorService, apiOrigin } from '../services';
 
 const DoctorList = () => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [specialty, setSpecialty] = useState('');
+
+  const getPhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http')) return photoPath;
+    return `${apiOrigin}/api/doctors${photoPath}`;
+  };
 
   const specialties = [
     'Cardiology', 'Dermatology', 'Neurology', 'Pediatrics',
@@ -98,8 +104,12 @@ const DoctorList = () => {
               >
                 <div className="flex items-start space-x-4 mb-6">
                   <div className="relative">
-                    <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center">
-                      <Stethoscope className="w-10 h-10 text-primary-600" />
+                    <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center overflow-hidden">
+                      {doctor.photoPath ? (
+                        <img src={getPhotoUrl(doctor.photoPath)} alt={doctor.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <Stethoscope className="w-10 h-10 text-primary-600" />
+                      )}
                     </div>
                     <div className="absolute -bottom-2 -right-2 bg-white p-1 rounded-lg shadow-sm border border-slate-100">
                       <div className="bg-green-500 w-3 h-3 rounded-full border-2 border-white" />
