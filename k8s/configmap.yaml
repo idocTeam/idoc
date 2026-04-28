@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: idoc-config
+  namespace: idoc
+data:
+  gateway-cors-origins: "http://localhost:30080,http://127.0.0.1:30080,http://localhost:5173,http://127.0.0.1:5173"
+  frontend-public-url: "http://localhost:30080"
+  admin-service-url: "http://admin-service:5004"
+  doctor-service-url: "http://doctor-service:5002"
+  patient-service-url: "http://patient-service:5003"
+  appointment-service-url: "http://appointment-service:5007"
+  payment-service-url: "http://payment-service:5005"
+  telemedicine-service-url: "http://telemedicine-service:5006"
+  notification-service-url: "http://notification-service:5008"
+  ai-symptoms-service-url: "http://ai-symptoms-service:3007"
+  ai-symptoms-patient-service-url: "http://patient-service:5003/auth"
+  openrouter-base-url: "https://openrouter.ai/api/v1"
+  openrouter-model: "openrouter/free"
+  node-env: "production"

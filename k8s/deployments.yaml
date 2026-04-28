@@ -1,0 +1,623 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: idoc/frontend:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: idoc/gateway:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: PORT
+              value: "5000"
+            - name: ADMIN_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: admin-service-url
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: doctor-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: appointment-service-url
+            - name: PAYMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: payment-service-url
+            - name: TELEMEDICINE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: telemedicine-service-url
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: notification-service-url
+            - name: AI_SYMPTOMS_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: ai-symptoms-service-url
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: gateway-cors-origins
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-service
+  template:
+    metadata:
+      labels:
+        app: admin-service
+    spec:
+      containers:
+        - name: admin-service
+          image: idoc/admin-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5004
+          env:
+            - name: PORT
+              value: "5004"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-jwt-secret
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: jwt-expires-in
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-email
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-password
+            - name: INTERNAL_SERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: internal-service-secret
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: doctor-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doctor-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doctor-service
+  template:
+    metadata:
+      labels:
+        app: doctor-service
+    spec:
+      containers:
+        - name: doctor-service
+          image: idoc/doctor-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5002
+          env:
+            - name: PORT
+              value: "5002"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: doctor-mongo-uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: doctor-jwt-secret
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: jwt-expires-in
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: appointment-service-url
+            - name: TELEMEDICINE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: telemedicine-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-service
+  template:
+    metadata:
+      labels:
+        app: patient-service
+    spec:
+      containers:
+        - name: patient-service
+          image: idoc/patient-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5003
+          env:
+            - name: PORT
+              value: "5003"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: patient-mongo-uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: patient-jwt-secret
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: jwt-expires-in
+            - name: INTERNAL_SERVICE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: internal-service-secret
+          volumeMounts:
+            - name: patient-uploads
+              mountPath: /app/uploads
+      volumes:
+        - name: patient-uploads
+          persistentVolumeClaim:
+            claimName: patient-uploads-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointment-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: appointment-service
+  template:
+    metadata:
+      labels:
+        app: appointment-service
+    spec:
+      containers:
+        - name: appointment-service
+          image: idoc/appointment-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5007
+          env:
+            - name: PORT
+              value: "5007"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: appointment-mongo-uri
+            - name: PATIENT_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: notification-patient-jwt-secret
+            - name: DOCTOR_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: notification-doctor-jwt-secret
+            - name: ADMIN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: notification-admin-jwt-secret
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: doctor-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: notification-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+        - name: payment-service
+          image: idoc/payment-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5005
+          env:
+            - name: PORT
+              value: "5005"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: payment-mongo-uri
+            - name: PATIENT_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: patient-jwt-secret
+            - name: DOCTOR_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: doctor-jwt-secret
+            - name: ADMIN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-jwt-secret
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: stripe-secret-key
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: stripe-publishable-key
+            - name: CLIENT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: frontend-public-url
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: appointment-service-url
+            - name: TELEMEDICINE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: telemedicine-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: doctor-service-url
+            - name: PAYMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: payment-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telemedicine-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telemedicine-service
+  template:
+    metadata:
+      labels:
+        app: telemedicine-service
+    spec:
+      containers:
+        - name: telemedicine-service
+          image: idoc/telemedicine-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5006
+          env:
+            - name: PORT
+              value: "5006"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: telemedicine-mongo-uri
+            - name: PATIENT_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: patient-jwt-secret
+            - name: DOCTOR_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: doctor-jwt-secret
+            - name: ADMIN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-jwt-secret
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: appointment-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: idoc/notification-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5008
+          env:
+            - name: PORT
+              value: "5008"
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: notification-mongo-uri
+            - name: PATIENT_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: patient-jwt-secret
+            - name: DOCTOR_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: doctor-jwt-secret
+            - name: ADMIN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: admin-jwt-secret
+            - name: JWT_EXPIRES_IN
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: jwt-expires-in
+            - name: EMAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: email-from
+            - name: SMTP_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: smtp-host
+            - name: SMTP_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: smtp-port
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: smtp-user
+            - name: SMTP_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: smtp-pass
+            - name: CLIENT_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: frontend-public-url
+            - name: ADMIN_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: admin-service-url
+            - name: DOCTOR_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: doctor-service-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: patient-service-url
+            - name: APPOINTMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: appointment-service-url
+            - name: TELEMEDICINE_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: telemedicine-service-url
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: notification-service-url
+            - name: PAYMENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: payment-service-url
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-symptoms-service
+  namespace: idoc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-symptoms-service
+  template:
+    metadata:
+      labels:
+        app: ai-symptoms-service
+    spec:
+      containers:
+        - name: ai-symptoms-service
+          image: idoc/ai-symptoms-service:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3007
+          env:
+            - name: PORT
+              value: "3007"
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: node-env
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: ai-symptoms-mongo-uri
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: idoc-secrets
+                  key: openrouter-api-key
+            - name: OPENROUTER_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: openrouter-model
+            - name: OPENROUTER_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: openrouter-base-url
+            - name: PATIENT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: idoc-config
+                  key: ai-symptoms-patient-service-url
