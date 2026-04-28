@@ -115,7 +115,13 @@ export const checkSymptoms = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     message: 'Symptom analysis completed successfully.',
-    data: symptomCheck
+    data: symptomCheck,
+    symptomCheck,
+    recommendation: symptomCheck.recommendation,
+    urgency: symptomCheck.urgency,
+    possibleConditions: symptomCheck.possibleConditions,
+    recommendedDoctorSpecialties: symptomCheck.recommendedDoctorSpecialties,
+    disclaimer: symptomCheck.disclaimer
   });
 });
 

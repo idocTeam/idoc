@@ -16,5 +16,5 @@ data:
   ai-symptoms-service-url: "http://ai-symptoms-service:3007"
   ai-symptoms-patient-service-url: "http://patient-service:5003/auth"
   openrouter-base-url: "https://openrouter.ai/api/v1"
-  openrouter-model: "openrouter/free"
+  openrouter-model: "openai/gpt-oss-120b:free"
   node-env: "production"
